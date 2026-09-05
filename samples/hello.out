@@ -1,0 +1,37 @@
+# Пример программы на языке OUT
+# Запустите в OUT IDE: F5
+
+print("Привет, мир!")
+
+# Функции
+def greet(name) {
+    print("Привет, " + name + "!")
+}
+
+greet("OUT")
+
+# Циклы
+for i in 1..5 {
+    print("Шаг: " + i)
+}
+
+# Массивы
+nums = [1, 2, 3, 4, 5]
+doubled = array::map(nums, fn(x) { return x * 2 })
+print("Удвоенные: " + doubled)
+
+# Словари
+person = {name: "OUT", version: 0.5}
+print("Язык: " + person.name)
+
+# Try/Catch
+try {
+    throw "ошибка"
+} catch(e) {
+    print("Поймано: " + e)
+}
+
+# Безопасный доступ
+data = {user: {name: "Алиса"}}
+print(data?.user?.name)
+print(data?.missing?.field)
