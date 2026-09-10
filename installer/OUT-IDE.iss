@@ -9,14 +9,13 @@ OutputBaseFilename=OUT-IDE-Setup-0.5.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 PrivilegesRequired=lowest
-SetupIconFile=icon.ico
+; SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\out.exe
 LicenseFile=LICENSE.txt
 WizardStyle=modern
 WizardSizePercent=110
-WindowVisible=yes
-WizardImageFile=wizard.bmp
-WizardSmallImageFile=wizard_small.bmp
+; WizardImageFile=wizard.bmp
+; WizardSmallImageFile=wizard_small.bmp
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -28,10 +27,10 @@ Name: "associateout"; Description: "Ассоциировать файлы .out �
 Name: "addpath"; Description: "Добавить OUT в PATH (для командной строки)"; GroupDescription: "Системные настройки:"; Flags: unchecked
 
 [Files]
-Source: "dist\OUT IDE.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\out-lang\out.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\out-lang\libs\*"; DestDir: "{app}\libs"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "sample\*"; DestDir: "{app}\samples"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\OUT IDE.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\out.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\out-lang\libs\*"; DestDir: "{app}\libs"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\samples\*"; DestDir: "{app}\samples"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\OUT IDE"; Filename: "{app}\OUT IDE.exe"
@@ -40,10 +39,10 @@ Name: "{autodesktop}\OUT IDE"; Filename: "{app}\OUT IDE.exe"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Flags: uninsdeletevalue; Tasks: addpath
-Root: HKCR; Subkey: ".out"; ValueType: string; ValueName: ""; ValueData: "OUTFile"; Flags: uninsdeletevalue; Tasks: associateout
-Root: HKCR; Subkey: "OUTFile"; ValueType: string; ValueName: ""; ValueData: "OUT Language Source"; Flags: uninsdeletekey; Tasks: associateout
-Root: HKCR; Subkey: "OUTFile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\OUT IDE.exe"" ""%1"""; Tasks: associateout
-Root: HKCR; Subkey: "OUTFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\out.exe,0"; Tasks: associateout
+Root: HKCU; Subkey: "Software\Classes\.out"; ValueType: string; ValueName: ""; ValueData: "OUTFile"; Flags: uninsdeletevalue; Tasks: associateout
+Root: HKCU; Subkey: "Software\Classes\OUTFile"; ValueType: string; ValueName: ""; ValueData: "OUT Language Source"; Flags: uninsdeletekey; Tasks: associateout
+Root: HKCU; Subkey: "Software\Classes\OUTFile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\OUT IDE.exe"" ""%1"""; Tasks: associateout
+Root: HKCU; Subkey: "Software\Classes\OUTFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\out.exe,0"; Tasks: associateout
 
 [Run]
 Filename: "{app}\OUT IDE.exe"; Description: "Запустить OUT IDE"; Flags: nowait postinstall skipifsilent
@@ -55,7 +54,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    if IsTaskSelected('addpath') then
+    if WizardIsTaskSelected('addpath') then
     begin
       Exec('cmd.exe', '/c setx PATH "%PATH%;{app}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;

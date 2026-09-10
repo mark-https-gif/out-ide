@@ -1,0 +1,8 @@
+build/
+dist/
+__pycache__/
+*.pyc
+*.spec
+OUT IDE.exe
+*.exe
+!samples/

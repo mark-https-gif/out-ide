@@ -5,8 +5,11 @@ import sys
 import tempfile
 import threading
 import time
+import json
+import urllib.request
+import urllib.error
 import tkinter as tk
-from tkinter import font as tkfont, filedialog, messagebox
+from tkinter import font as tkfont, filedialog, messagebox, ttk
 import json
 
 
@@ -454,6 +457,223 @@ class FindReplaceDialog:
         self._on_change()
 
 
+GITHUB_RAW = "https://raw.githubusercontent.com"
+GITHUB_REPO = "mark-https-gif/out-lang-libs/main"
+
+
+def get_libs_dir():
+    base = get_base_path()
+    local = os.path.join(base, "libs")
+    if os.path.isdir(local):
+        return local
+    home = os.path.expanduser("~")
+    p = os.path.join(home, ".out", "libs")
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
+def get_catalog():
+    catalog_path = os.path.join(get_base_path(), "libs_catalog.json")
+    if os.path.exists(catalog_path):
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def get_installed_libs():
+    libs_dir = get_libs_dir()
+    installed = []
+    if os.path.isdir(libs_dir):
+        for f in os.listdir(libs_dir):
+            if f.endswith(".out"):
+                path = os.path.join(libs_dir, f)
+                size = os.path.getsize(path)
+                installed.append({"name": f, "path": path, "size": size})
+    return installed
+
+
+def download_lib(url, name):
+    libs_dir = get_libs_dir()
+    os.makedirs(libs_dir, exist_ok=True)
+    full_url = f"{GITHUB_RAW}/{GITHUB_REPO}/{url}.out"
+    try:
+        req = urllib.request.Request(full_url, headers={"User-Agent": "OUT-IDE"})
+        resp = urllib.request.urlopen(req, timeout=30)
+        data = resp.read()
+        dst = os.path.join(libs_dir, f"{name}.out")
+        with open(dst, "wb") as f:
+            f.write(data)
+        return True, len(data)
+    except Exception as e:
+        return False, str(e)
+
+
+def delete_lib(name):
+    libs_dir = get_libs_dir()
+    path = os.path.join(libs_dir, name)
+    if os.path.exists(path):
+        os.remove(path)
+        return True
+    return False
+
+
+class LibManagerDialog:
+    def __init__(self, parent):
+        self.top = tk.Toplevel(parent)
+        self.top.title("Менеджер библиотек")
+        self.top.geometry("700x550")
+        self.top.configure(bg=BG_DARK)
+        self.top.transient(parent)
+        self.top.grab_set()
+
+        self.catalog = get_catalog()
+        self.installed = {lib["name"] for lib in get_installed_libs()}
+
+        self._build_ui()
+        self._refresh_list()
+
+    def _build_ui(self):
+        hdr = tk.Frame(self.top, bg=BG_TITLE, height=50)
+        hdr.pack(fill=tk.X)
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text="  Библиотеки OUT", font=("Segoe UI", 14, "bold"),
+                 fg=FG_BRIGHT, bg=BG_TITLE).pack(side=tk.LEFT, padx=10)
+
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *a: self._refresh_list())
+        e = tk.Entry(hdr, textvariable=self.search_var, font=("Segoe UI", 10),
+                      bg=BG_INPUT, fg=FG_DARK, insertbackground="white", bd=0,
+                      highlightthickness=1, highlightbackground="#555", width=30)
+        e.pack(side=tk.RIGHT, padx=10, pady=8)
+        tk.Label(hdr, text="🔍", font=("Segoe UI", 10), fg=FG_DIM, bg=BG_TITLE).pack(side=tk.RIGHT)
+
+        bar = tk.Frame(self.top, bg=BG_TOOLBAR, height=36)
+        bar.pack(fill=tk.X)
+        bar.pack_propagate(False)
+        tk.Button(bar, text="⟳ Обновить", command=self._refresh_list,
+                  font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK, bd=0,
+                  activebackground="#4a4a4a", cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
+        tk.Button(bar, text="📂 Папка libs", command=self._open_libs_dir,
+                  font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK, bd=0,
+                  activebackground="#4a4a4a", cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
+
+        self.status_var = tk.StringVar(value="Готово")
+        tk.Label(bar, textvariable=self.status_var, font=("Segoe UI", 9),
+                 fg=FG_DIM, bg=BG_TOOLBAR).pack(side=tk.RIGHT, padx=10)
+
+        container = tk.Frame(self.top, bg=BG_DARK)
+        container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+
+        cols = ("name", "status", "description")
+        self.tree = ttk.Treeview(container, columns=cols, show="headings", selectmode="browse")
+        self.tree.heading("name", text="Название")
+        self.tree.heading("status", text="Статус")
+        self.tree.heading("description", text="Описание")
+        self.tree.column("name", width=130, minwidth=100)
+        self.tree.column("status", width=100, minwidth=80)
+        self.tree.column("description", width=430, minwidth=200)
+
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview", background=BG_DARK, foreground=FG_DARK,
+                         fieldbackground=BG_DARK, font=("Segoe UI", 9), rowheight=28)
+        style.configure("Treeview.Heading", background=BG_TOOLBAR, foreground=FG_DARK,
+                         font=("Segoe UI", 9, "bold"))
+        style.map("Treeview", background=[("selected", "#264f78")],
+                  foreground=[("selected", FG_BRIGHT)])
+
+        sb = tk.Scrollbar(container, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        btn_frame = tk.Frame(self.top, bg=BG_DARK)
+        btn_frame.pack(fill=tk.X, padx=8, pady=(0, 8))
+
+        self.install_btn = tk.Button(btn_frame, text="⬇ Установить", command=self._install_selected,
+                                      font=("Segoe UI", 10, "bold"), bg="#2e7d32", fg=FG_BRIGHT,
+                                      bd=0, padx=16, pady=6, activebackground="#388e3c",
+                                      cursor="hand2")
+        self.install_btn.pack(side=tk.LEFT, padx=(0, 8))
+
+        self.uninstall_btn = tk.Button(btn_frame, text="✕ Удалить", command=self._uninstall_selected,
+                                        font=("Segoe UI", 10), bg="#c62828", fg=FG_BRIGHT,
+                                        bd=0, padx=16, pady=6, activebackground="#d32f2f",
+                                        cursor="hand2")
+        self.uninstall_btn.pack(side=tk.LEFT)
+
+    def _refresh_list(self):
+        self.tree.delete(*self.tree.get_children())
+        search = self.search_var.get().lower()
+        self.catalog = get_catalog()
+        self.installed = {lib["name"] for lib in get_installed_libs()}
+
+        for lib in self.catalog:
+            if search and search not in lib["name"].lower() and search not in lib.get("description", "").lower():
+                continue
+            status = "✅ Установлена" if lib["name"] in self.installed else "⬜ Доступна"
+            tags = ("installed",) if lib["name"] in self.installed else ()
+            self.tree.insert("", tk.END, values=(lib["name"], status, lib.get("description", "")),
+                             tags=tags, iid=lib["name"])
+
+        self.tree.tag_configure("installed", foreground=FG_GREEN)
+        self.status_var.set(f"Каталог: {len(self.catalog)} | Установлено: {len(self.installed)}")
+
+    def _get_selected(self):
+        sel = self.tree.selection()
+        if not sel:
+            return None
+        name = sel[0]
+        for lib in self.catalog:
+            if lib["name"] == name:
+                return lib
+        return None
+
+    def _install_selected(self):
+        lib = self._get_selected()
+        if not lib:
+            return
+        if lib["name"] in self.installed:
+            self.status_var.set(f"{lib['name']} уже установлена")
+            return
+        self.status_var.set(f"Загрузка {lib['name']}...")
+        self.install_btn.config(state=tk.DISABLED)
+
+        def worker():
+            ok, result = download_lib(lib.get("url", lib["name"]), lib["name"])
+            self.top.after(0, self._on_install_done, lib["name"], ok, result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_install_done(self, name, ok, result):
+        self.install_btn.config(state=tk.NORMAL)
+        if ok:
+            self.status_var.set(f"✅ {name} установлена ({result} байт)")
+            self._refresh_list()
+        else:
+            self.status_var.set(f"❌ Ошибка: {result}")
+
+    def _uninstall_selected(self):
+        lib = self._get_selected()
+        if not lib:
+            return
+        if lib["name"] not in self.installed:
+            self.status_var.set(f"{lib['name']} не установлена")
+            return
+        if not messagebox.askyesno("Удаление", f"Удалить библиотеку {lib['name']}?"):
+            return
+        if delete_lib(lib["name"] + ".out"):
+            self.status_var.set(f"🗑 {lib['name']} удалена")
+            self._refresh_list()
+        else:
+            self.status_var.set(f"❌ Не удалось удалить {lib['name']}")
+
+    def _open_libs_dir(self):
+        libs_dir = get_libs_dir()
+        os.makedirs(libs_dir, exist_ok=True)
+        os.startfile(libs_dir)
+
+
 class OutIde:
     def __init__(self, root):
         self.root = root
@@ -519,6 +739,8 @@ class OutIde:
         view_menu.add_command(label="Проводник       Ctrl+Shift+E", command=self._toggle_sidebar)
         view_menu.add_command(label="Панель вывода   Ctrl+`", command=self._toggle_panel)
         view_menu.add_command(label="Миникарта", command=self._toggle_minimap)
+        view_menu.add_separator()
+        view_menu.add_command(label="Библиотеки      Ctrl+Shift+L", command=self._open_lib_manager)
         mb.add_cascade(label="Вид", menu=view_menu)
 
         help_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
@@ -681,6 +903,7 @@ class OutIde:
         self.root.bind("<Control-f>", lambda e: self._toggle_find())
         self.root.bind("<Control-grave>", lambda e: self._toggle_panel())
         self.root.bind("<Control-Shift-E>", lambda e: self._toggle_sidebar())
+        self.root.bind("<Control-Shift-L>", lambda e: self._open_lib_manager())
         self.root.bind("<F5>", lambda e: self.run_script())
 
         self.editor.bind("<KeyRelease>", self._on_key)
@@ -1117,6 +1340,9 @@ class OutIde:
 
     def _toggle_find(self):
         self.find_dialog.toggle()
+
+    def _open_lib_manager(self):
+        LibManagerDialog(self.root)
 
     def _on_tab_select(self, tab):
         if tab and tab["path"] and os.path.exists(tab["path"]):
