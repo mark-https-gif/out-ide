@@ -1,11 +1,11 @@
 [Setup]
 AppName=OUT Language IDE
-AppVersion=0.5.1
+AppVersion=0.6.0
 AppPublisher=OUT Language
 DefaultDirName={autopf}\OUT Language
 DefaultGroupName=OUT Language
 OutputDir=installer
-OutputBaseFilename=OUT-IDE-Setup-0.5.1
+OutputBaseFilename=OUT-IDE-Setup-0.6.0
 Compression=lzma2/ultra64
 SolidCompression=yes
 PrivilegesRequired=lowest

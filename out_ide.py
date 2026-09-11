@@ -69,7 +69,7 @@ def find_out_exe():
 
 
 KEYWORDS = (
-    "def", "return", "if", "else", "for", "in", "while", "break", "continue",
+    "def", "fn", "return", "if", "else", "for", "in", "while", "break", "continue",
     "import", "from", "as", "true", "false", "null", "and", "or", "not",
     "class", "new", "this", "super", "try", "catch", "throw",
 )
@@ -84,7 +84,7 @@ MODULES = (
 )
 
 KEYWORD_COLORS = {
-    "def": "#c586c0", "return": "#c586c0", "if": "#c586c0", "else": "#c586c0",
+    "def": "#c586c0", "fn": "#c586c0", "return": "#c586c0", "if": "#c586c0", "else": "#c586c0",
     "for": "#c586c0", "in": "#c586c0", "while": "#c586c0", "break": "#c586c0",
     "continue": "#c586c0", "import": "#c586c0", "from": "#c586c0",
     "true": "#569cd6", "false": "#569cd6", "null": "#569cd6",
