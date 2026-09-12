@@ -21,36 +21,196 @@ def get_base_path():
 
 OUT_EXE = os.path.join(get_base_path(), "out.exe")
 APP_NAME = "OUT IDE"
-APP_VERSION = "0.5.1"
+APP_VERSION = "0.6.1"
 
-BG_DARK = "#1e1e1e"
-BG_SIDEBAR = "#252526"
-BG_PANEL = "#1e1e1e"
-BG_TAB = "#2d2d2d"
-BG_TAB_ACTIVE = "#1e1e1e"
-BG_TITLE = "#3c3c3c"
-BG_STATUS = "#007acc"
-BG_STATUS_ERROR = "#c24038"
-BG_TOOLBAR = "#333333"
-BG_INPUT = "#3c3c3c"
-FG_DARK = "#cccccc"
-FG_DIM = "#858585"
-FG_BRIGHT = "#ffffff"
-FG_ACCENT = "#569cd6"
-FG_GREEN = "#4ec9b0"
-FG_STRING = "#ce9178"
-FG_NUMBER = "#b5cea8"
-FG_KEYWORD = "#c586c0"
-FG_COMMENT = "#6a9955"
-FG_FUNCTION = "#dcdcaa"
-FG_MODULE = "#4ec9b0"
-FG_ERROR = "#f44747"
-FG_WARN = "#cca700"
-FG_BRACKET = "#ffd700"
-BG_ERROR_LINE = "#5a1d1d"
-BG_CURRENT_LINE = "#2a2d2e"
-BG_SPLASH = "#0e1525"
-SPLASH_ACCENT = "#007acc"
+DEFAULT_THEME = "dark"
+_current_theme = DEFAULT_THEME
+
+THEMES = {
+    "dark": {
+        "bg": "#1e1e1e",
+        "sidebar": "#252526",
+        "panel": "#1e1e1e",
+        "tab": "#2d2d2d",
+        "tab_active": "#1e1e1e",
+        "title": "#3c3c3c",
+        "status": "#007acc",
+        "status_error": "#c24038",
+        "toolbar": "#333333",
+        "input": "#3c3c3c",
+        "seal": "#3c3c3c",
+        "sep": "#555555",
+        "fg": "#cccccc",
+        "dim": "#858585",
+        "bright": "#ffffff",
+        "accent": "#569cd6",
+        "green": "#4ec9b0",
+        "string": "#ce9178",
+        "number": "#b5cea8",
+        "keyword": "#c586c0",
+        "comment": "#6a9955",
+        "function": "#dcdcaa",
+        "module": "#4ec9b0",
+        "error": "#f44747",
+        "warn": "#cca700",
+        "bracket": "#ffd700",
+        "error_line_bg": "#5a1d1d",
+        "current_line_bg": "#2a2d2e",
+        "selection": "#264f78",
+        "caret": "#ffffff",
+        "hover": "#4a4a4a",
+        "find_highlight_bg": "#613214",
+        "minimap_plain": "#555555",
+        "splash_bg": "#0e1525",
+        "splash_accent": "#007acc",
+        "viewport": "#ffffff",
+    },
+    "light": {
+        "bg": "#ffffff",
+        "sidebar": "#f3f3f3",
+        "panel": "#ffffff",
+        "tab": "#ececec",
+        "tab_active": "#ffffff",
+        "title": "#f3f3f3",
+        "status": "#007acc",
+        "status_error": "#c24038",
+        "toolbar": "#f3f3f3",
+        "input": "#ffffff",
+        "seal": "#c8c8c8",
+        "sep": "#c8c8c8",
+        "fg": "#333333",
+        "dim": "#717171",
+        "bright": "#000000",
+        "accent": "#007acc",
+        "green": "#12801c",
+        "string": "#a31515",
+        "number": "#098658",
+        "keyword": "#0000ff",
+        "comment": "#008000",
+        "function": "#795e26",
+        "module": "#12801c",
+        "error": "#e51400",
+        "warn": "#bf8803",
+        "bracket": "#7f3fbf",
+        "error_line_bg": "#fce4e4",
+        "current_line_bg": "#f5f5f5",
+        "selection": "#add6ff",
+        "caret": "#000000",
+        "hover": "#e6e6e6",
+        "find_highlight_bg": "#ffe58f",
+        "minimap_plain": "#e0e0e0",
+        "splash_bg": "#f3f3f3",
+        "splash_accent": "#007acc",
+        "viewport": "#d0d0d0",
+    },
+}
+
+
+def th(name):
+    return THEMES[_current_theme][name]
+
+
+def make_keyword_colors():
+    return {
+        "def": th("keyword"), "fn": th("keyword"), "return": th("keyword"),
+        "if": th("keyword"), "else": th("keyword"), "for": th("keyword"),
+        "in": th("keyword"), "while": th("keyword"), "break": th("keyword"),
+        "continue": th("keyword"), "import": th("keyword"), "from": th("keyword"),
+        "true": th("accent"), "false": th("accent"), "null": th("accent"),
+        "and": th("accent"), "or": th("accent"), "not": th("accent"),
+        "try": th("keyword"), "catch": th("keyword"), "throw": th("keyword"),
+        "class": th("green"), "new": th("green"), "this": th("green"), "super": th("green"),
+    }
+
+
+KEYWORD_COLORS = make_keyword_colors()
+
+
+def get_config_path():
+    home = os.path.expanduser("~")
+    cfg_dir = os.path.join(home, ".out")
+    os.makedirs(cfg_dir, exist_ok=True)
+    return os.path.join(cfg_dir, "ide_config.json")
+
+
+def load_theme_config():
+    global _current_theme
+    try:
+        with open(get_config_path(), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("theme") in THEMES:
+            _current_theme = data["theme"]
+    except Exception:
+        pass
+
+
+def save_theme_config(name):
+    try:
+        with open(get_config_path(), "w", encoding="utf-8") as f:
+            json.dump({"theme": name}, f)
+    except Exception:
+        pass
+
+
+def _normalize_hex(color):
+    if color is None:
+        return ""
+    color = str(color).lower().strip()
+    m = re.match(r"^#([0-9a-f])\1([0-9a-f])\2([0-9a-f])\3$", color)
+    if m:
+        return f"#{m.group(1)}{m.group(2)}{m.group(3)}"
+    return color
+
+
+def _recolor_children(widget, old_theme, new_theme):
+    bg_map = {}
+    fg_map = {}
+    for k, v in old_theme.items():
+        nv = new_theme[k]
+        bg_map.setdefault(_normalize_hex(v), nv)
+        fg_map.setdefault(_normalize_hex(v), nv)
+
+    def rec(w):
+        try:
+            bg = w.cget("bg")
+            nb = bg_map.get(_normalize_hex(bg))
+            if nb:
+                w.configure(bg=nb)
+        except tk.TclError:
+            pass
+        try:
+            fg = w.cget("fg")
+            nf = fg_map.get(_normalize_hex(fg))
+            if nf:
+                w.configure(fg=nf)
+        except tk.TclError:
+            pass
+        try:
+            if isinstance(w, tk.Entry) or isinstance(w, tk.Text):
+                ibg = w.cget("insertbackground")
+                nb = bg_map.get(_normalize_hex(ibg))
+                if nb:
+                    w.configure(insertbackground=nb)
+            if isinstance(w, tk.Entry):
+                hb = w.cget("highlightbackground")
+                nb = bg_map.get(_normalize_hex(hb))
+                if nb:
+                    w.configure(highlightbackground=nb)
+            if isinstance(w, tk.Button):
+                abg = w.cget("activebackground")
+                nb = bg_map.get(_normalize_hex(abg))
+                if nb:
+                    w.configure(activebackground=nb)
+        except tk.TclError:
+            pass
+        for c in w.winfo_children():
+            try:
+                rec(c)
+            except tk.TclError:
+                pass
+    rec(widget)
+
+
 TAB_HEIGHT = 35
 STATUS_HEIGHT = 24
 TOOLBAR_HEIGHT = 40
@@ -83,23 +243,13 @@ MODULES = (
     "array", "dict", "shell",
 )
 
-KEYWORD_COLORS = {
-    "def": "#c586c0", "fn": "#c586c0", "return": "#c586c0", "if": "#c586c0", "else": "#c586c0",
-    "for": "#c586c0", "in": "#c586c0", "while": "#c586c0", "break": "#c586c0",
-    "continue": "#c586c0", "import": "#c586c0", "from": "#c586c0",
-    "true": "#569cd6", "false": "#569cd6", "null": "#569cd6",
-    "and": "#569cd6", "or": "#569cd6", "not": "#569cd6",
-    "try": "#c586c0", "catch": "#c586c0", "throw": "#c586c0",
-    "class": "#4ec9b0", "new": "#4ec9b0", "this": "#4ec9b0", "super": "#4ec9b0",
-}
-
 
 class SplashScreen:
     def __init__(self, on_done):
         self.on_done = on_done
         self.root = tk.Tk()
         self.root.overrideredirect(True)
-        self.root.configure(bg=BG_SPLASH)
+        self.root.configure(bg=th("splash_bg"))
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
         w, h = 480, 300
@@ -108,27 +258,27 @@ class SplashScreen:
         self.root.geometry(f"{w}x{h}+{x}+{y}")
         self.root.attributes("-topmost", True)
 
-        c = tk.Canvas(self.root, width=w, height=h, bg=BG_SPLASH, highlightthickness=0)
+        c = tk.Canvas(self.root, width=w, height=h, bg=th("splash_bg"), highlightthickness=0)
         c.pack(fill=tk.BOTH, expand=True)
 
-        c.create_rectangle(0, 0, w, 3, fill=SPLASH_ACCENT, outline="")
+        c.create_rectangle(0, 0, w, 3, fill=th("splash_accent"), outline="")
 
         c.create_text(w // 2, 70, text="OUT", font=("Segoe UI Light", 48),
-                       fill=SPLASH_ACCENT, anchor="center")
+                       fill=th("splash_accent"), anchor="center")
         c.create_text(w // 2, 120, text="Language IDE", font=("Segoe UI", 14),
-                       fill=FG_DIM, anchor="center")
+                       fill=th("dim"), anchor="center")
         c.create_text(w // 2, 155, text=f"v{APP_VERSION}", font=("Segoe UI", 10),
-                       fill=FG_DIM, anchor="center")
+                       fill=th("dim"), anchor="center")
 
         c.create_text(w // 2, 200, text="Загрузка компонентов...",
-                       font=("Segoe UI", 9), fill=FG_DIM, anchor="center", tags="loading")
+                       font=("Segoe UI", 9), fill=th("dim"), anchor="center", tags="loading")
 
         bar_w = 300
         bar_h = 4
         bx = (w - bar_w) // 2
         by = 230
-        c.create_rectangle(bx, by, bx + bar_w, by + bar_h, fill="#1a1a2e", outline="")
-        self.bar = c.create_rectangle(bx, by, bx, by + bar_h, fill=SPLASH_ACCENT, outline="")
+        c.create_rectangle(bx, by, bx + bar_w, by + bar_h, fill=th("title"), outline="")
+        self.bar = c.create_rectangle(bx, by, bx, by + bar_h, fill=th("splash_accent"), outline="")
         self.bar_w = bar_w
         self.bx = bx
         self.by = by
@@ -171,27 +321,27 @@ class SplashScreen:
 class FileExplorer:
     def __init__(self, parent, on_open):
         self.on_open = on_open
-        self.frame = tk.Frame(parent, bg=BG_SIDEBAR, width=SIDEBAR_WIDTH)
+        self.frame = tk.Frame(parent, bg=th("sidebar"), width=SIDEBAR_WIDTH)
         self.frame.pack_propagate(False)
         self.current_dir = ""
         self._build()
 
     def _build(self):
-        hdr = tk.Frame(self.frame, bg=BG_SIDEBAR)
+        hdr = tk.Frame(self.frame, bg=th("sidebar"))
         hdr.pack(fill=tk.X, padx=8, pady=(8, 4))
         tk.Label(hdr, text="ПРОВОДНИК", font=("Segoe UI", 10, "bold"),
-                 fg=FG_DIM, bg=BG_SIDEBAR).pack(side=tk.LEFT)
-        tk.Label(hdr, text="⟳", font=("Segoe UI", 11), fg=FG_DIM, bg=BG_SIDEBAR,
+                 fg=th("dim"), bg=th("sidebar")).pack(side=tk.LEFT)
+        tk.Label(hdr, text="⟳", font=("Segoe UI", 11), fg=th("dim"), bg=th("sidebar"),
                  cursor="hand2").pack(side=tk.RIGHT)
         hdr.winfo_children()[-1].bind("<Button-1>", lambda e: self.refresh())
 
-        sep = tk.Frame(self.frame, bg="#3c3c3c", height=1)
+        sep = tk.Frame(self.frame, bg=th("title"), height=1)
         sep.pack(fill=tk.X)
 
-        container = tk.Frame(self.frame, bg=BG_SIDEBAR)
+        container = tk.Frame(self.frame, bg=th("sidebar"))
         container.pack(fill=tk.BOTH, expand=True)
 
-        self.tree = tk.Canvas(container, bg=BG_SIDEBAR, highlightthickness=0)
+        self.tree = tk.Canvas(container, bg=th("sidebar"), highlightthickness=0)
         sb = tk.Scrollbar(container, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
@@ -216,14 +366,14 @@ class FileExplorer:
         files = [e for e in entries if os.path.isfile(os.path.join(self.current_dir, e))]
 
         self.tree.create_text(8, y, text=os.path.basename(self.current_dir) or self.current_dir,
-                              font=("Segoe UI", 10, "bold"), fill=FG_BRIGHT, anchor="w")
+                              font=("Segoe UI", 10, "bold"), fill=th("bright"), anchor="w")
         y += 22
 
         for d in dirs:
             if d.startswith(".") or d.startswith("__"):
                 continue
             self.tree.create_text(16, y, text=f"📁 {d}", font=("Segoe UI", 9),
-                                  fill=FG_DIM, anchor="w", tags=("item",))
+                                  fill=th("dim"), anchor="w", tags=("item",))
             y += 22
 
         for f in files:
@@ -236,7 +386,7 @@ class FileExplorer:
             elif ext == ".exe":
                 icon = "⚙"
             self.tree.create_text(16, y, text=f"{icon} {f}", font=("Segoe UI", 9),
-                                  fill=FG_DIM, anchor="w", cursor="hand2", tags=("file",))
+                                  fill=th("dim"), anchor="w", cursor="hand2", tags=("file",))
             fp = os.path.join(self.current_dir, f)
             self.tree.tag_bind("file", "<Button-1>", lambda e, p=fp: self._open_file(p))
             y += 22
@@ -253,9 +403,9 @@ class TabBar:
         self.on_close = on_close
         self.tabs = []
         self.active = None
-        self.frame = tk.Frame(parent, bg=BG_TAB, height=TAB_HEIGHT)
+        self.frame = tk.Frame(parent, bg=th("tab"), height=TAB_HEIGHT)
         self.frame.pack_propagate(False)
-        self.container = tk.Frame(self.frame, bg=BG_TAB)
+        self.container = tk.Frame(self.frame, bg=th("tab"))
         self.container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     def add_tab(self, title, filepath):
@@ -264,21 +414,21 @@ class TabBar:
                 self.select(t)
                 return
         tab = {"title": title, "path": filepath, "frame": None, "label": None, "close": None}
-        f = tk.Frame(self.container, bg=BG_TAB, height=TAB_HEIGHT)
+        f = tk.Frame(self.container, bg=th("tab"), height=TAB_HEIGHT)
         f.pack_propagate(False)
         f.pack(side=tk.LEFT, padx=(1, 0))
 
-        inner = tk.Frame(f, bg=BG_TAB)
+        inner = tk.Frame(f, bg=th("tab"))
         inner.pack(fill=tk.BOTH, expand=True, padx=4)
         inner.pack_propagate(False)
 
         lbl = tk.Label(inner, text=f" {title} ", font=("Segoe UI", 9),
-                        fg=FG_DIM, bg=BG_TAB, cursor="hand2")
+                        fg=th("dim"), bg=th("tab"), cursor="hand2")
         lbl.pack(side=tk.LEFT, fill=tk.Y)
         lbl.bind("<Button-1>", lambda e, t=tab: self.select(t))
 
-        cls = tk.Label(inner, text="✕", font=("Segoe UI", 8), fg=FG_DIM,
-                        bg=BG_TAB, cursor="hand2", padx=4)
+        cls = tk.Label(inner, text="✕", font=("Segoe UI", 8), fg=th("dim"),
+                        bg=th("tab"), cursor="hand2", padx=4)
         cls.pack(side=tk.RIGHT)
         cls.bind("<Button-1>", lambda e, t=tab: self.close_tab(t))
 
@@ -291,11 +441,11 @@ class TabBar:
     def select(self, tab):
         for t in self.tabs:
             if t["frame"]:
-                t["frame"].configure(bg=BG_TAB)
-                t["label"].configure(bg=BG_TAB, fg=FG_DIM)
+                t["frame"].configure(bg=th("tab"))
+                t["label"].configure(bg=th("tab"), fg=th("dim"))
         if tab and tab["frame"]:
-            tab["frame"].configure(bg=BG_TAB_ACTIVE)
-            tab["label"].configure(bg=BG_TAB_ACTIVE, fg=FG_BRIGHT)
+            tab["frame"].configure(bg=th("tab_active"))
+            tab["label"].configure(bg=th("tab_active"), fg=th("bright"))
         self.active = tab
         if tab:
             self.on_select(tab)
@@ -328,41 +478,41 @@ class FindReplaceDialog:
         self._create()
 
     def _create(self):
-        self.frame = tk.Frame(self.editor.master, bg=BG_TITLE, bd=0)
-        row1 = tk.Frame(self.frame, bg=BG_TITLE)
+        self.frame = tk.Frame(self.editor.master, bg=th("title"), bd=0)
+        row1 = tk.Frame(self.frame, bg=th("title"))
         row1.pack(fill=tk.X, padx=8, pady=(6, 2))
 
-        tk.Label(row1, text="Найти:", font=("Segoe UI", 9), fg=FG_DIM,
-                 bg=BG_TITLE).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(row1, text="Найти:", font=("Segoe UI", 9), fg=th("dim"),
+                 bg=th("title")).pack(side=tk.LEFT, padx=(0, 6))
         e1 = tk.Entry(row1, textvariable=self.find_var, font=("Consolas", 10),
-                       bg=BG_INPUT, fg=FG_DARK, insertbackground="white", bd=0,
-                       highlightthickness=1, highlightbackground="#555")
+                       bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                       highlightthickness=1, highlightbackground=th("title"))
         e1.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
         e1.bind("<KeyRelease>", lambda e: self._on_change())
         e1.bind("<Return>", lambda e: self.find_next())
 
         tk.Label(row1, textvariable=self.match_var, font=("Segoe UI", 9),
-                 fg=FG_DIM, bg=BG_TITLE, width=14).pack(side=tk.LEFT, padx=(0, 6))
+                 fg=th("dim"), bg=th("title"), width=14).pack(side=tk.LEFT, padx=(0, 6))
 
-        tk.Button(row1, text="▼", font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK,
+        tk.Button(row1, text="▼", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
                   bd=0, command=self.find_next, width=3).pack(side=tk.LEFT, padx=1)
-        tk.Button(row1, text="▲", font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK,
+        tk.Button(row1, text="▲", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
                   bd=0, command=self.find_prev, width=3).pack(side=tk.LEFT, padx=1)
-        tk.Button(row1, text="✕", font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK,
+        tk.Button(row1, text="✕", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
                   bd=0, command=self.hide, width=3).pack(side=tk.LEFT, padx=1)
 
-        row2 = tk.Frame(self.frame, bg=BG_TITLE)
+        row2 = tk.Frame(self.frame, bg=th("title"))
         row2.pack(fill=tk.X, padx=8, pady=(2, 6))
 
-        tk.Label(row2, text="Заменить:", font=("Segoe UI", 9), fg=FG_DIM,
-                 bg=BG_TITLE).pack(side=tk.LEFT, padx=(0, 2))
+        tk.Label(row2, text="Заменить:", font=("Segoe UI", 9), fg=th("dim"),
+                 bg=th("title")).pack(side=tk.LEFT, padx=(0, 2))
         tk.Entry(row2, textvariable=self.replace_var, font=("Consolas", 10),
-                 bg=BG_INPUT, fg=FG_DARK, insertbackground="white", bd=0,
-                 highlightthickness=1, highlightbackground="#555").pack(
+                 bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                 highlightthickness=1, highlightbackground=th("title")).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
-        tk.Button(row2, text="Заменить", font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK,
+        tk.Button(row2, text="Заменить", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
                   bd=0, command=self.replace_one).pack(side=tk.LEFT, padx=1)
-        tk.Button(row2, text="Все", font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK,
+        tk.Button(row2, text="Все", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
                   bd=0, command=self.replace_all).pack(side=tk.LEFT, padx=1)
 
     def toggle(self):
@@ -398,7 +548,7 @@ class FindReplaceDialog:
             self.editor.tag_add("find_highlight", pos, end)
             count += 1
             start = end
-        self.editor.tag_configure("find_highlight", background="#613214", foreground=FG_BRIGHT)
+        self.editor.tag_configure("find_highlight", background=th("find_highlight_bg"), foreground=th("bright"))
         self.match_var.set(f"{count} совпадений")
 
     def find_next(self):
@@ -522,7 +672,7 @@ class LibManagerDialog:
         self.top = tk.Toplevel(parent)
         self.top.title("Менеджер библиотек")
         self.top.geometry("700x550")
-        self.top.configure(bg=BG_DARK)
+        self.top.configure(bg=th("bg"))
         self.top.transient(parent)
         self.top.grab_set()
 
@@ -533,35 +683,35 @@ class LibManagerDialog:
         self._refresh_list()
 
     def _build_ui(self):
-        hdr = tk.Frame(self.top, bg=BG_TITLE, height=50)
+        hdr = tk.Frame(self.top, bg=th("title"), height=50)
         hdr.pack(fill=tk.X)
         hdr.pack_propagate(False)
         tk.Label(hdr, text="  Библиотеки OUT", font=("Segoe UI", 14, "bold"),
-                 fg=FG_BRIGHT, bg=BG_TITLE).pack(side=tk.LEFT, padx=10)
+                 fg=th("bright"), bg=th("title")).pack(side=tk.LEFT, padx=10)
 
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *a: self._refresh_list())
         e = tk.Entry(hdr, textvariable=self.search_var, font=("Segoe UI", 10),
-                      bg=BG_INPUT, fg=FG_DARK, insertbackground="white", bd=0,
-                      highlightthickness=1, highlightbackground="#555", width=30)
+                      bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                      highlightthickness=1, highlightbackground=th("title"), width=30)
         e.pack(side=tk.RIGHT, padx=10, pady=8)
-        tk.Label(hdr, text="🔍", font=("Segoe UI", 10), fg=FG_DIM, bg=BG_TITLE).pack(side=tk.RIGHT)
+        tk.Label(hdr, text="🔍", font=("Segoe UI", 10), fg=th("dim"), bg=th("title")).pack(side=tk.RIGHT)
 
-        bar = tk.Frame(self.top, bg=BG_TOOLBAR, height=36)
+        bar = tk.Frame(self.top, bg=th("toolbar"), height=36)
         bar.pack(fill=tk.X)
         bar.pack_propagate(False)
         tk.Button(bar, text="⟳ Обновить", command=self._refresh_list,
-                  font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK, bd=0,
-                  activebackground="#4a4a4a", cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
+                  font=("Segoe UI", 9), bg=th("input"), fg=th("fg"), bd=0,
+                  activebackground=th("hover"), cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
         tk.Button(bar, text="📂 Папка libs", command=self._open_libs_dir,
-                  font=("Segoe UI", 9), bg=BG_INPUT, fg=FG_DARK, bd=0,
-                  activebackground="#4a4a4a", cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
+                  font=("Segoe UI", 9), bg=th("input"), fg=th("fg"), bd=0,
+                  activebackground=th("hover"), cursor="hand2").pack(side=tk.LEFT, padx=6, pady=4)
 
         self.status_var = tk.StringVar(value="Готово")
         tk.Label(bar, textvariable=self.status_var, font=("Segoe UI", 9),
-                 fg=FG_DIM, bg=BG_TOOLBAR).pack(side=tk.RIGHT, padx=10)
+                 fg=th("dim"), bg=th("toolbar")).pack(side=tk.RIGHT, padx=10)
 
-        container = tk.Frame(self.top, bg=BG_DARK)
+        container = tk.Frame(self.top, bg=th("bg"))
         container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
         cols = ("name", "status", "description")
@@ -575,29 +725,29 @@ class LibManagerDialog:
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Treeview", background=BG_DARK, foreground=FG_DARK,
-                         fieldbackground=BG_DARK, font=("Segoe UI", 9), rowheight=28)
-        style.configure("Treeview.Heading", background=BG_TOOLBAR, foreground=FG_DARK,
+        style.configure("Treeview", background=th("bg"), foreground=th("fg"),
+                         fieldbackground=th("bg"), font=("Segoe UI", 9), rowheight=28)
+        style.configure("Treeview.Heading", background=th("toolbar"), foreground=th("fg"),
                          font=("Segoe UI", 9, "bold"))
-        style.map("Treeview", background=[("selected", "#264f78")],
-                  foreground=[("selected", FG_BRIGHT)])
+        style.map("Treeview", background=[("selected", th("selection"))],
+                  foreground=[("selected", th("bright"))])
 
         sb = tk.Scrollbar(container, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self.tree.pack(fill=tk.BOTH, expand=True)
 
-        btn_frame = tk.Frame(self.top, bg=BG_DARK)
+        btn_frame = tk.Frame(self.top, bg=th("bg"))
         btn_frame.pack(fill=tk.X, padx=8, pady=(0, 8))
 
         self.install_btn = tk.Button(btn_frame, text="⬇ Установить", command=self._install_selected,
-                                      font=("Segoe UI", 10, "bold"), bg="#2e7d32", fg=FG_BRIGHT,
+                                      font=("Segoe UI", 10, "bold"), bg="#2e7d32", fg=th("bright"),
                                       bd=0, padx=16, pady=6, activebackground="#388e3c",
                                       cursor="hand2")
         self.install_btn.pack(side=tk.LEFT, padx=(0, 8))
 
         self.uninstall_btn = tk.Button(btn_frame, text="✕ Удалить", command=self._uninstall_selected,
-                                        font=("Segoe UI", 10), bg="#c62828", fg=FG_BRIGHT,
+                                        font=("Segoe UI", 10), bg="#c62828", fg=th("bright"),
                                         bd=0, padx=16, pady=6, activebackground="#d32f2f",
                                         cursor="hand2")
         self.uninstall_btn.pack(side=tk.LEFT)
@@ -616,7 +766,7 @@ class LibManagerDialog:
             self.tree.insert("", tk.END, values=(lib["name"], status, lib.get("description", "")),
                              tags=tags, iid=lib["name"])
 
-        self.tree.tag_configure("installed", foreground=FG_GREEN)
+        self.tree.tag_configure("installed", foreground=th("green"))
         self.status_var.set(f"Каталог: {len(self.catalog)} | Установлено: {len(self.installed)}")
 
     def _get_selected(self):
@@ -680,7 +830,7 @@ class OutIde:
         self.root.title(f"{APP_NAME} — {APP_VERSION}")
         self.root.geometry("1400x850")
         self.root.minsize(900, 600)
-        self.root.configure(bg=BG_DARK)
+        self.root.configure(bg=th("bg"))
 
         self.current_file = ""
         self.last_error = ""
@@ -690,6 +840,7 @@ class OutIde:
         self._sidebar_visible = True
         self._panel_visible = True
         self._panel_height = 200
+        self.theme_var = tk.StringVar(value=_current_theme)
 
         self._build_menu()
         self._build_toolbar()
@@ -700,11 +851,11 @@ class OutIde:
         self._update_cursor_pos()
 
     def _build_menu(self):
-        mb = tk.Menu(self.root, bg=BG_TITLE, fg=FG_DARK, activebackground=SPLASH_ACCENT,
-                     activeforeground=FG_BRIGHT, bd=0, font=("Segoe UI", 9))
+        mb = tk.Menu(self.root, bg=th("title"), fg=th("fg"), activebackground=th("splash_accent"),
+                     activeforeground=th("bright"), bd=0, font=("Segoe UI", 9))
 
-        file_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                            activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        file_menu = tk.Menu(mb, tearoff=0, bg=th("title"), fg=th("fg"),
+                            activebackground=th("splash_accent"), activeforeground=th("bright"),
                             font=("Segoe UI", 9))
         file_menu.add_command(label="Новый файл        Ctrl+N", command=self.new_file)
         file_menu.add_command(label="Открыть...        Ctrl+O", command=self.open_file)
@@ -714,8 +865,8 @@ class OutIde:
         file_menu.add_command(label="Выход", command=self.root.quit)
         mb.add_cascade(label="Файл", menu=file_menu)
 
-        edit_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                            activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        edit_menu = tk.Menu(mb, tearoff=0, bg=th("title"), fg=th("fg"),
+                            activebackground=th("splash_accent"), activeforeground=th("bright"),
                             font=("Segoe UI", 9))
         edit_menu.add_command(label="Отменить       Ctrl+Z", command=lambda: self.editor.edit_undo())
         edit_menu.add_command(label="Повторить       Ctrl+Y", command=lambda: self.editor.edit_redo())
@@ -725,26 +876,33 @@ class OutIde:
                               command=lambda: self.editor.tag_add("sel", "1.0", tk.END))
         mb.add_cascade(label="Правка", menu=edit_menu)
 
-        run_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                           activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        run_menu = tk.Menu(mb, tearoff=0, bg=th("title"), fg=th("fg"),
+                           activebackground=th("splash_accent"), activeforeground=th("bright"),
                            font=("Segoe UI", 9))
         run_menu.add_command(label="Проверить      Ctrl+T", command=self.verify_script)
         run_menu.add_command(label="Запустить      Ctrl+R", command=self.run_script)
         run_menu.add_command(label="Компилировать  Ctrl+B", command=self.compile_script)
         mb.add_cascade(label="Запуск", menu=run_menu)
 
-        view_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                            activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        view_menu = tk.Menu(mb, tearoff=0, bg=th("title"), fg=th("fg"),
+                            activebackground=th("splash_accent"), activeforeground=th("bright"),
                             font=("Segoe UI", 9))
         view_menu.add_command(label="Проводник       Ctrl+Shift+E", command=self._toggle_sidebar)
         view_menu.add_command(label="Панель вывода   Ctrl+`", command=self._toggle_panel)
         view_menu.add_command(label="Миникарта", command=self._toggle_minimap)
         view_menu.add_separator()
         view_menu.add_command(label="Библиотеки      Ctrl+Shift+L", command=self._open_lib_manager)
+        view_menu.add_separator()
+        view_menu.add_radiobutton(label="Тёмная тема", value="dark",
+                                  variable=self.theme_var,
+                                  command=lambda: self.apply_theme("dark"))
+        view_menu.add_radiobutton(label="Светлая тема", value="light",
+                                  variable=self.theme_var,
+                                  command=lambda: self.apply_theme("light"))
         mb.add_cascade(label="Вид", menu=view_menu)
 
-        help_menu = tk.Menu(mb, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                            activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        help_menu = tk.Menu(mb, tearoff=0, bg=th("title"), fg=th("fg"),
+                            activebackground=th("splash_accent"), activeforeground=th("bright"),
                             font=("Segoe UI", 9))
         help_menu.add_command(label="О программе", command=lambda: messagebox.showinfo(
             APP_NAME, f"{APP_NAME} v{APP_VERSION}\nЯзык программирования OUT\nКомпилятор + IDE"))
@@ -753,69 +911,69 @@ class OutIde:
         self.root.config(menu=mb)
 
     def _build_toolbar(self):
-        self.toolbar = tk.Frame(self.root, bg=BG_TOOLBAR, height=TOOLBAR_HEIGHT)
+        self.toolbar = tk.Frame(self.root, bg=th("toolbar"), height=TOOLBAR_HEIGHT)
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
         self.toolbar.pack_propagate(False)
 
         bs = {"font": ("Segoe UI", 9), "bd": 0, "padx": 10, "pady": 5, "cursor": "hand2",
-              "activebackground": "#4a4a4a", "activeforeground": FG_BRIGHT}
+              "activebackground": "#4a4a4a", "activeforeground": th("bright")}
 
         tools = [
-            ("📂 Открыть", self.open_file, BG_TOOLBAR, FG_DIM),
-            ("💾 Сохранить", self.save_file, BG_TOOLBAR, FG_DIM),
+            ("📂 Открыть", self.open_file, th("toolbar"), th("dim")),
+            ("💾 Сохранить", self.save_file, th("toolbar"), th("dim")),
             (None, None, None, None),
-            ("✓ Проверить", self.verify_script, "#6b2fa0", FG_BRIGHT),
-            ("▶ Запустить", self.run_script, "#2e7d32", FG_BRIGHT),
-            ("⚙ Компиляция", self.compile_script, "#1565c0", FG_BRIGHT),
+            ("✓ Проверить", self.verify_script, "#6b2fa0", th("bright")),
+            ("▶ Запустить", self.run_script, "#2e7d32", th("bright")),
+            ("⚙ Компиляция", self.compile_script, "#1565c0", th("bright")),
             (None, None, None, None),
-            ("📋 Копировать ошибку", self.copy_error, "#e65100", FG_BRIGHT),
+            ("📋 Копировать ошибку", self.copy_error, "#e65100", th("bright")),
         ]
 
         for item in tools:
             if item[0] is None:
-                tk.Frame(self.toolbar, width=1, bg="#555").pack(side=tk.LEFT, fill=tk.Y, padx=6, pady=6)
+                tk.Frame(self.toolbar, width=1, bg=th("title")).pack(side=tk.LEFT, fill=tk.Y, padx=6, pady=6)
             else:
                 tk.Button(self.toolbar, text=item[0], command=item[1],
                           bg=item[2], fg=item[3], **bs).pack(side=tk.LEFT, padx=2, pady=4)
 
-        right = tk.Frame(self.toolbar, bg=BG_TOOLBAR)
+        right = tk.Frame(self.toolbar, bg=th("toolbar"))
         right.pack(side=tk.RIGHT, padx=8)
         tk.Label(right, text="OUT Language", font=("Segoe UI", 9, "italic"),
-                 fg=FG_DIM, bg=BG_TOOLBAR).pack(side=tk.RIGHT)
+                 fg=th("dim"), bg=th("toolbar")).pack(side=tk.RIGHT)
 
     def _build_tab_bar(self):
         self.tab_bar = TabBar(self.root, on_select=self._on_tab_select, on_close=self._on_tab_close)
 
     def _build_main_area(self):
-        self.main_pane = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, bg=BG_DARK,
+        self.main_pane = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, bg=th("bg"),
                                          sashwidth=3, sashrelief=tk.FLAT, borderwidth=0)
         self.main_pane.pack(fill=tk.BOTH, expand=True)
 
         self.sidebar = FileExplorer(self.main_pane, on_open=self.open_file)
         self.main_pane.add(self.sidebar.frame, width=SIDEBAR_WIDTH, stretch="never")
 
-        right_pane = tk.PanedWindow(self.main_pane, orient=tk.VERTICAL, bg=BG_DARK,
+        right_pane = tk.PanedWindow(self.main_pane, orient=tk.VERTICAL, bg=th("bg"),
                                      sashwidth=3, sashrelief=tk.FLAT, borderwidth=0)
         self.main_pane.add(right_pane, stretch="always")
 
-        editor_frame = tk.Frame(right_pane, bg=BG_DARK)
+        editor_frame = tk.Frame(right_pane, bg=th("bg"))
 
-        self.editor_area = tk.Frame(editor_frame, bg=BG_DARK)
+        self.editor_area = tk.Frame(editor_frame, bg=th("bg"))
         self.editor_area.pack(fill=tk.BOTH, expand=True)
 
         self.line_numbers = tk.Text(self.editor_area, wrap=tk.NONE, state=tk.DISABLED,
-                                     font=("Consolas", 11), bg=BG_SIDEBAR, fg=FG_DIM,
+                                     font=("Consolas", 11), bg=th("sidebar"), fg=th("dim"),
                                      width=5, padx=6, takefocus=0, border=0,
                                      highlightthickness=0, cursor="arrow")
         self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
 
         self.editor = tk.Text(self.editor_area, wrap=tk.NONE, undo=True,
-                               font=("Consolas", 11), bg=BG_DARK, fg=FG_DARK,
+                               font=("Consolas", 11), bg=th("bg"), fg=th("fg"),
                                insertbackground="white", border=0, highlightthickness=0,
-                               selectbackground="#264f78", padx=8)
+                               selectbackground=th("selection"), padx=8)
         self.editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.minimap = tk.Canvas(self.editor_area, width=MINIMAP_WIDTH, bg=BG_DARK,
+        self.minimap = tk.Canvas(self.editor_area, width=MINIMAP_WIDTH, bg=th("bg"),
                                   highlightthickness=0, cursor="arrow")
         self.minimap.pack(side=tk.RIGHT, fill=tk.Y)
         self.minimap.bind("<Button-1>", self._minimap_click)
@@ -824,71 +982,71 @@ class OutIde:
 
         self.find_dialog = FindReplaceDialog(self.editor, self.editor)
 
-        self.output_frame = tk.Frame(right_pane, bg=BG_DARK)
+        self.output_frame = tk.Frame(right_pane, bg=th("bg"))
 
-        panel_tabs = tk.Frame(self.output_frame, bg=BG_TAB, height=28)
+        panel_tabs = tk.Frame(self.output_frame, bg=th("tab"), height=28)
         panel_tabs.pack(fill=tk.X)
         panel_tabs.pack_propagate(False)
 
         self._panel_tab_btns = []
         for name in ["Вывод", "Проблемы"]:
             btn = tk.Label(panel_tabs, text=f"  {name}  ", font=("Segoe UI", 9),
-                           fg=FG_DIM, bg=BG_TAB, cursor="hand2", padx=8)
+                           fg=th("dim"), bg=th("tab"), cursor="hand2", padx=8)
             btn.pack(side=tk.LEFT)
             self._panel_tab_btns.append((name, btn))
 
         self.output = tk.Text(self.output_frame, wrap=tk.NONE, state=tk.DISABLED,
-                               font=("Consolas", 10), bg=BG_PANEL, fg=FG_GREEN, border=0,
+                               font=("Consolas", 10), bg=th("panel"), fg=th("green"), border=0,
                                highlightthickness=0, padx=8, pady=4)
         self.output.pack(fill=tk.BOTH, expand=True)
-        self.output.tag_configure("error", foreground=FG_ERROR)
-        self.output.tag_configure("ok", foreground=FG_GREEN)
-        self.output.tag_configure("info", foreground=FG_ACCENT)
-        self.output.tag_configure("warn", foreground=FG_WARN)
+        self.output.tag_configure("error", foreground=th("error"))
+        self.output.tag_configure("ok", foreground=th("green"))
+        self.output.tag_configure("info", foreground=th("accent"))
+        self.output.tag_configure("warn", foreground=th("warn"))
 
         right_pane.add(editor_frame, stretch="always")
         right_pane.add(self.output_frame, height=self._panel_height, stretch="never")
 
     def _build_status_bar(self):
-        self.status_bar = tk.Frame(self.root, bg=BG_STATUS, height=STATUS_HEIGHT)
+        self.status_bar = tk.Frame(self.root, bg=th("status"), height=STATUS_HEIGHT)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self.status_bar.pack_propagate(False)
 
         self.status_left = tk.Label(self.status_bar, text="Готово", anchor="w",
-                                     bg=BG_STATUS, fg=FG_BRIGHT, font=("Segoe UI", 9), padx=10)
+                                     bg=th("status"), fg=th("bright"), font=("Segoe UI", 9), padx=10)
         self.status_left.pack(side=tk.LEFT, fill=tk.Y)
 
-        right = tk.Frame(self.status_bar, bg=BG_STATUS)
+        right = tk.Frame(self.status_bar, bg=th("status"))
         right.pack(side=tk.RIGHT)
 
         self.cursor_pos = tk.Label(right, text="Стр 1, Стлб 1", anchor="e",
-                                    bg=BG_STATUS, fg=FG_BRIGHT, font=("Segoe UI", 9), padx=8)
+                                    bg=th("status"), fg=th("bright"), font=("Segoe UI", 9), padx=8)
         self.cursor_pos.pack(side=tk.RIGHT)
 
         self.lang_label = tk.Label(right, text="OUT", anchor="e",
-                                    bg=BG_STATUS, fg=FG_BRIGHT, font=("Segoe UI", 9), padx=8)
+                                    bg=th("status"), fg=th("bright"), font=("Segoe UI", 9), padx=8)
         self.lang_label.pack(side=tk.RIGHT)
 
         self.enc_label = tk.Label(right, text="UTF-8", anchor="e",
-                                   bg=BG_STATUS, fg=FG_BRIGHT, font=("Segoe UI", 9), padx=8)
+                                   bg=th("status"), fg=th("bright"), font=("Segoe UI", 9), padx=8)
         self.enc_label.pack(side=tk.RIGHT)
 
     def _setup_tags(self):
         tags = {
-            "keyword": FG_KEYWORD, "builtin": FG_FUNCTION, "string": FG_STRING,
-            "number": FG_NUMBER, "comment": FG_COMMENT, "module": FG_MODULE,
-            "func": FG_FUNCTION, "bracket": FG_BRACKET, "operator": FG_DARK,
-            "error_line": None, "current_line": BG_CURRENT_LINE,
+            "keyword": th("keyword"), "builtin": th("function"), "string": th("string"),
+            "number": th("number"), "comment": th("comment"), "module": th("module"),
+            "func": th("function"), "bracket": th("bracket"), "operator": th("fg"),
+            "error_line": None, "current_line": th("current_line_bg"),
             "find_highlight": None,
         }
         for name, color in tags.items():
             if color and name not in ("error_line", "current_line", "find_highlight"):
                 self.editor.tag_configure(name, foreground=color)
-        self.editor.tag_configure("error_line", background=BG_ERROR_LINE)
-        self.editor.tag_configure("current_line", background=BG_CURRENT_LINE)
-        self.editor.tag_configure("find_highlight", background="#613214", foreground=FG_BRIGHT)
+        self.editor.tag_configure("error_line", background=th("error_line_bg"))
+        self.editor.tag_configure("current_line", background=th("current_line_bg"))
+        self.editor.tag_configure("find_highlight", background=th("find_highlight_bg"), foreground=th("bright"))
 
-        self.line_numbers.tag_configure("current", foreground=FG_BRIGHT, font=("Consolas", 11, "bold"))
+        self.line_numbers.tag_configure("current", foreground=th("bright"), font=("Consolas", 11, "bold"))
 
     def _bind_keys(self):
         self.root.bind("<Control-n>", lambda e: self.new_file())
@@ -913,8 +1071,8 @@ class OutIde:
         self.editor.bind("<Button-5>", lambda e: self._update_line_numbers())
         self.editor.bind("<Button-3>", self._show_context_menu)
 
-        self.context_menu = tk.Menu(self.root, tearoff=0, bg=BG_TITLE, fg=FG_DARK,
-                                    activebackground=SPLASH_ACCENT, activeforeground=FG_BRIGHT,
+        self.context_menu = tk.Menu(self.root, tearoff=0, bg=th("title"), fg=th("fg"),
+                                    activebackground=th("splash_accent"), activeforeground=th("bright"),
                                     font=("Segoe UI", 9), bd=0)
         self.context_menu.add_command(label="Вырезать        Ctrl+X", command=self._cut)
         self.context_menu.add_command(label="Копировать      Ctrl+C", command=self._copy)
@@ -1189,19 +1347,19 @@ class OutIde:
             x = 8 + indent * 0.8
 
             if stripped.startswith("#"):
-                color = FG_COMMENT
+                color = th("comment")
             elif stripped.startswith(("def ", "class ")):
-                color = FG_KEYWORD
+                color = th("keyword")
             elif stripped.startswith(("if ", "for ", "while ", "try", "catch")):
-                color = "#c586c0"
+                color = th("keyword")
             elif stripped.startswith(("import ", "from ")):
-                color = FG_MODULE
+                color = th("module")
             elif stripped.startswith(("return ", "throw ")):
-                color = FG_KEYWORD
+                color = th("keyword")
             elif '"' in stripped or "'" in stripped:
-                color = FG_STRING
+                color = th("string")
             else:
-                color = "#555555"
+                color = th("minimap_plain")
 
             self.minimap.create_rectangle(x, y, x + width, y + max(line_h - 1, 1),
                                            fill=color, outline="")
@@ -1209,7 +1367,7 @@ class OutIde:
         vp_top = int(view_start * h)
         vp_bottom = int(view_end * h)
         self.minimap.create_rectangle(0, vp_top, MINIMAP_WIDTH, vp_bottom,
-                                       fill="#ffffff", outline="", stipple="gray25")
+                                       fill=th("viewport"), outline="", stipple="gray25")
 
     def _minimap_click(self, event):
         h = self.minimap.winfo_height()
@@ -1271,7 +1429,7 @@ class OutIde:
                         j += 1
                     word = line[start:j]
                     if word in KEYWORDS:
-                        color = KEYWORD_COLORS.get(word, FG_KEYWORD)
+                        color = KEYWORD_COLORS.get(word, th("keyword"))
                         self.editor.tag_add("keyword", f"{ln}.{start}", f"{ln}.{j}")
                     elif word in BUILTINS:
                         self.editor.tag_add("builtin", f"{ln}.{start}", f"{ln}.{j}")
@@ -1343,6 +1501,49 @@ class OutIde:
 
     def _open_lib_manager(self):
         LibManagerDialog(self.root)
+
+    def apply_theme(self, name):
+        global _current_theme, KEYWORD_COLORS
+        if name not in THEMES or name == _current_theme:
+            return
+        old = _current_theme
+        _current_theme = name
+        self.theme_var.set(name)
+        save_theme_config(name)
+        KEYWORD_COLORS = make_keyword_colors()
+        self.root.configure(bg=th("bg"))
+        self._build_menu()
+        for w in self.toolbar.winfo_children():
+            w.destroy()
+        self._build_toolbar()
+        _recolor_children(self.root, THEMES[old], THEMES[name])
+        self.editor.configure(bg=th("bg"), fg=th("fg"),
+                              insertbackground=th("caret"),
+                              selectbackground=th("selection"))
+        self.line_numbers.configure(bg=th("sidebar"), fg=th("dim"))
+        self.minimap.configure(bg=th("bg"))
+        self.output.configure(bg=th("panel"), fg=th("green"))
+        self.output.tag_configure("error", foreground=th("error"))
+        self.output.tag_configure("ok", foreground=th("green"))
+        self.output.tag_configure("info", foreground=th("accent"))
+        self.output.tag_configure("warn", foreground=th("warn"))
+        self.status_bar.configure(bg=th("status"))
+        if hasattr(self, 'context_menu'):
+            self.context_menu.configure(bg=th("title"), fg=th("fg"),
+                                        activebackground=th("splash_accent"),
+                                        activeforeground=th("bright"))
+        if hasattr(self, 'sidebar'):
+            self.sidebar.frame.configure(bg=th("sidebar"))
+            self.sidebar.tree.configure(bg=th("sidebar"))
+            self.sidebar.refresh()
+        self._setup_tags()
+        self._highlight_syntax()
+        self._update_line_numbers()
+        self._update_minimap()
+        if hasattr(self, 'tab_bar') and self.tab_bar.active:
+            self.tab_bar.select(self.tab_bar.active)
+        suffix = f" — {os.path.basename(self.current_file)}" if self.current_file else ""
+        self.root.title(f"{APP_NAME}{suffix}")
 
     def _on_tab_select(self, tab):
         if tab and tab["path"] and os.path.exists(tab["path"]):
@@ -1438,8 +1639,8 @@ class OutIde:
         self._set_output("$ out verify\n")
 
         def on_done(code, out):
-            self.status_bar.configure(bg=BG_STATUS)
-            self.status_left.configure(bg=BG_STATUS)
+            self.status_bar.configure(bg=th("status"))
+            self.status_left.configure(bg=th("status"))
             if code == 0:
                 self._append_output("Ошибок нет\n", "ok")
                 self.status_left.config(text="Ошибок нет")
@@ -1460,8 +1661,8 @@ class OutIde:
         self._set_output("$ out run\n")
 
         def on_done(code, out):
-            self.status_bar.configure(bg=BG_STATUS)
-            self.status_left.configure(bg=BG_STATUS)
+            self.status_bar.configure(bg=th("status"))
+            self.status_left.configure(bg=th("status"))
             if code == 0:
                 self._append_output(out, "ok")
                 self.status_left.config(text="Завершено")
@@ -1483,8 +1684,8 @@ class OutIde:
         self._set_output("$ out compile\n")
 
         def on_done(code, out):
-            self.status_bar.configure(bg=BG_STATUS)
-            self.status_left.configure(bg=BG_STATUS)
+            self.status_bar.configure(bg=th("status"))
+            self.status_left.configure(bg=th("status"))
             if code == 0 and os.path.exists(outpath):
                 size = os.path.getsize(outpath) // 1024
                 self._append_output(f"Готово: {outpath}\nРазмер: {size} КБ\n", "ok")
@@ -1506,6 +1707,8 @@ class OutIde:
 
 
 def main():
+    load_theme_config()
+
     def start_ide():
         root = tk.Tk()
         root.withdraw()
