@@ -159,30 +159,6 @@ def save_theme_config(name):
         pass
 
 
-def get_github_token():
-    try:
-        with open(get_config_path(), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data.get("github_token", "")
-    except Exception:
-        return ""
-
-
-def save_github_token(token):
-    try:
-        data = {}
-        try:
-            with open(get_config_path(), "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
-        data["github_token"] = token
-        with open(get_config_path(), "w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except Exception:
-        pass
-
-
 def _normalize_hex(color):
     if color is None:
         return ""
@@ -736,23 +712,15 @@ def parse_version(v):
         return (0, 0, 0)
 
 
-def check_update(token=None):
-    token = token or get_github_token()
-    full_url = f"https://api.github.com/repos/{UPDATE_REPO}/contents/update.json"
-    headers = {"User-Agent": "OUT-IDE", "Accept": "application/vnd.github.v3.raw"}
-    if token:
-        headers["Authorization"] = f"token {token}"
-    req = urllib.request.Request(full_url, headers=headers)
+def check_update():
+    full_url = f"{GITHUB_RAW}/{UPDATE_REPO}/main/update.json"
+    req = urllib.request.Request(full_url, headers={"User-Agent": "OUT-IDE"})
     resp = urllib.request.urlopen(req, timeout=30)
-    data = json.loads(resp.read().decode("utf-8"))
-    return data
+    return json.loads(resp.read().decode("utf-8"))
 
 
-def download_installer(asset_url, token, dest):
-    headers = {"User-Agent": "OUT-IDE", "Accept": "application/octet-stream"}
-    if token:
-        headers["Authorization"] = f"token {token}"
-    req = urllib.request.Request(asset_url, headers=headers)
+def download_installer(asset_url, dest):
+    req = urllib.request.Request(asset_url, headers={"User-Agent": "OUT-IDE"})
     resp = urllib.request.urlopen(req, timeout=300)
     with open(dest, "wb") as f:
         while True:
@@ -947,28 +915,27 @@ class UpdateDialog:
                              fg=th("fg"), bg=th("bg"), justify=tk.LEFT, anchor="w", wraplength=470)
         self.info.pack(fill=tk.X, pady=(4, 8))
 
-        tok_row = tk.Frame(body, bg=th("bg"))
-        tok_row.pack(fill=tk.X, pady=(8, 4))
-        tk.Label(tok_row, text="GitHub токен:", font=("Segoe UI", 9),
+        link_row = tk.Frame(body, bg=th("bg"))
+        link_row.pack(fill=tk.X, pady=(8, 4))
+        tk.Label(link_row, text="Сервер обновлений:", font=("Segoe UI", 9),
                  fg=th("dim"), bg=th("bg")).pack(side=tk.LEFT, padx=(0, 6))
-        self.token_var = tk.StringVar(value=get_github_token())
-        self.token_entry = tk.Entry(tok_row, textvariable=self.token_var, font=("Consolas", 9),
-                                    bg=th("input"), fg=th("fg"),
-                                    insertbackground=th("caret"), bd=0,
-                                    highlightthickness=1, highlightbackground=th("title"), show="*")
-        self.token_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.token_entry.bind("<Return>", lambda e: self._check())
-        hint = tk.Label(body, text="Токен нужен для доступа к приватному серверу обновлений.\nСоздать: GitHub → Settings → Developer settings → Tokens (classic) → доступ: repo.",
-                        font=("Segoe UI", 8), fg=th("dim"), bg=th("bg"), justify=tk.LEFT, anchor="w")
-        hint.pack(fill=tk.X, pady=(0, 6))
+        self.link_var = tk.StringVar(value=f"{GITHUB_RAW}/{UPDATE_REPO}/main/update.json")
+        tk.Entry(link_row, textvariable=self.link_var, font=("Consolas", 8),
+                 bg=th("input"), fg=th("fg"), bd=0,
+                 highlightthickness=1, highlightbackground=th("title")).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         bar = tk.Frame(self.top, bg=th("bg"))
         bar.pack(fill=tk.X, padx=14, pady=(0, 12))
+        self.check_btn = tk.Button(bar, text="Проверить снова", command=self._check,
+                                   font=("Segoe UI", 10), bg=th("input"), fg=th("fg"),
+                                   bd=0, padx=16, pady=6, activebackground=th("hover"),
+                                   cursor="hand2")
+        self.check_btn.pack(side=tk.LEFT)
         self.download_btn = tk.Button(bar, text="⬇ Скачать и установить", command=self._download,
                                       font=("Segoe UI", 10, "bold"), bg="#2e7d32", fg=th("bright"),
                                       bd=0, padx=16, pady=6, activebackground="#388e3c",
                                       cursor="hand2", state=tk.DISABLED)
-        self.download_btn.pack(side=tk.LEFT)
+        self.download_btn.pack(side=tk.LEFT, padx=(8, 0))
         self.close_btn = tk.Button(bar, text="Закрыть", command=self.top.destroy,
                                    font=("Segoe UI", 10), bg=th("input"), fg=th("fg"),
                                    bd=0, padx=16, pady=6, activebackground=th("hover"),
@@ -976,21 +943,14 @@ class UpdateDialog:
         self.close_btn.pack(side=tk.LEFT, padx=(8, 0))
 
     def _check(self):
-        token = self.token_var.get().strip()
-        save_github_token(token)
-        if not token:
-            self.info_var.set("Введите GitHub-токен для доступа к серверу обновлений\nи нажмите Enter.")
-            self.download_btn.config(state=tk.DISABLED)
-            self.result = None
-            self.token_entry.focus_set()
-            return
         self.info_var.set("Проверка обновлений...")
         self.download_btn.config(state=tk.DISABLED)
+        self.check_btn.config(state=tk.DISABLED)
         self.result = None
 
         def worker():
             try:
-                data = check_update(token)
+                data = check_update()
                 self.top.after(0, self._on_check_done, True, data)
             except Exception as e:
                 self.top.after(0, self._on_check_done, False, str(e))
@@ -998,12 +958,9 @@ class UpdateDialog:
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_check_done(self, ok, result):
+        self.check_btn.config(state=tk.NORMAL)
         if not ok:
-            if "404" in str(result) or "403" in str(result):
-                self.info_var.set(f"Нет доступа к серверу обновлений.\n"
-                                  f"Проверьте токен (должен иметь доступ repo).\n{result}")
-            else:
-                self.info_var.set(f"Ошибка проверки обновлений:\n{result}")
+            self.info_var.set(f"Ошибка проверки обновлений:\n{result}")
             return
         self.result = result
         try:
@@ -1033,14 +990,14 @@ class UpdateDialog:
         if not asset_url:
             self.info_var.set("Ссылка на установщик не найдена")
             return
-        token = self.token_var.get().strip()
         self.download_btn.config(state=tk.DISABLED)
+        self.check_btn.config(state=tk.DISABLED)
         self.info_var.set("Скачивание установщика...")
 
         def worker():
             try:
                 dest = os.path.join(tempfile.gettempdir(), "OUT-IDE-Setup.exe")
-                download_installer(asset_url, token, dest)
+                download_installer(asset_url, dest)
                 self.top.after(0, self._on_download_done, True, dest)
             except Exception as e:
                 self.top.after(0, self._on_download_done, False, str(e))
@@ -1048,6 +1005,7 @@ class UpdateDialog:
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_download_done(self, ok, result):
+        self.check_btn.config(state=tk.NORMAL)
         if not ok:
             self.download_btn.config(state=tk.NORMAL)
             self.info_var.set(f"Ошибка скачивания:\n{result}")
