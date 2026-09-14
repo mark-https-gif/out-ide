@@ -21,7 +21,7 @@ def get_base_path():
 
 OUT_EXE = os.path.join(get_base_path(), "out.exe")
 APP_NAME = "OUT IDE"
-APP_VERSION = "0.6.1"
+APP_VERSION = "0.6.2"
 
 DEFAULT_THEME = "dark"
 _current_theme = DEFAULT_THEME
@@ -146,8 +146,39 @@ def load_theme_config():
 
 def save_theme_config(name):
     try:
+        data = {}
+        try:
+            with open(get_config_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            pass
+        data["theme"] = name
         with open(get_config_path(), "w", encoding="utf-8") as f:
-            json.dump({"theme": name}, f)
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def get_github_token():
+    try:
+        with open(get_config_path(), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("github_token", "")
+    except Exception:
+        return ""
+
+
+def save_github_token(token):
+    try:
+        data = {}
+        try:
+            with open(get_config_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            pass
+        data["github_token"] = token
+        with open(get_config_path(), "w", encoding="utf-8") as f:
+            json.dump(data, f)
     except Exception:
         pass
 
@@ -216,6 +247,35 @@ STATUS_HEIGHT = 24
 TOOLBAR_HEIGHT = 40
 SIDEBAR_WIDTH = 260
 MINIMAP_WIDTH = 100
+
+
+def open_text(path):
+    with open(path, "rb") as f:
+        raw = f.read(4)
+    if raw[:2] == b"\xff\xfe":
+        encoding = "utf-16"
+    elif raw[:2] == b"\xfe\xff":
+        encoding = "utf-16-be"
+    elif raw[:3] == b"\xef\xbb\xbf":
+        encoding = "utf-8-sig"
+    else:
+        encoding = "utf-8"
+    with open(path, "r", encoding=encoding, errors="replace") as f:
+        return encoding, f.read()
+
+
+def save_text(path, text, encoding):
+    if encoding == "utf-16":
+        with open(path, "wb") as f:
+            f.write(b"\xff\xfe")
+            f.write(text.encode("utf-16-le"))
+    elif encoding == "utf-16-be":
+        with open(path, "wb") as f:
+            f.write(b"\xfe\xff")
+            f.write(text.encode("utf-16-be"))
+    else:
+        with open(path, "w", encoding=encoding) as f:
+            f.write(text)
 
 
 def find_out_exe():
@@ -485,7 +545,7 @@ class FindReplaceDialog:
         tk.Label(row1, text="Найти:", font=("Segoe UI", 9), fg=th("dim"),
                  bg=th("title")).pack(side=tk.LEFT, padx=(0, 6))
         e1 = tk.Entry(row1, textvariable=self.find_var, font=("Consolas", 10),
-                       bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                       bg=th("input"), fg=th("fg"), insertbackground=th("caret"), bd=0,
                        highlightthickness=1, highlightbackground=th("title"))
         e1.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
         e1.bind("<KeyRelease>", lambda e: self._on_change())
@@ -507,7 +567,7 @@ class FindReplaceDialog:
         tk.Label(row2, text="Заменить:", font=("Segoe UI", 9), fg=th("dim"),
                  bg=th("title")).pack(side=tk.LEFT, padx=(0, 2))
         tk.Entry(row2, textvariable=self.replace_var, font=("Consolas", 10),
-                 bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                 bg=th("input"), fg=th("fg"), insertbackground=th("caret"), bd=0,
                  highlightthickness=1, highlightbackground=th("title")).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
         tk.Button(row2, text="Заменить", font=("Segoe UI", 9), bg=th("input"), fg=th("fg"),
@@ -609,6 +669,7 @@ class FindReplaceDialog:
 
 GITHUB_RAW = "https://raw.githubusercontent.com"
 GITHUB_REPO = "mark-https-gif/out-lang-libs/main"
+UPDATE_REPO = "mark-https-gif/out-updates"
 
 
 def get_libs_dir():
@@ -667,6 +728,41 @@ def delete_lib(name):
     return False
 
 
+def parse_version(v):
+    try:
+        digits = re.findall(r"\d+", v)
+        return tuple(int(d) for d in digits[:3])
+    except Exception:
+        return (0, 0, 0)
+
+
+def check_update(token=None):
+    token = token or get_github_token()
+    full_url = f"https://api.github.com/repos/{UPDATE_REPO}/contents/update.json"
+    headers = {"User-Agent": "OUT-IDE", "Accept": "application/vnd.github.v3.raw"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+    req = urllib.request.Request(full_url, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=30)
+    data = json.loads(resp.read().decode("utf-8"))
+    return data
+
+
+def download_installer(asset_url, token, dest):
+    headers = {"User-Agent": "OUT-IDE", "Accept": "application/octet-stream"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+    req = urllib.request.Request(asset_url, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=300)
+    with open(dest, "wb") as f:
+        while True:
+            chunk = resp.read(65536)
+            if not chunk:
+                break
+            f.write(chunk)
+    return dest
+
+
 class LibManagerDialog:
     def __init__(self, parent):
         self.top = tk.Toplevel(parent)
@@ -692,7 +788,7 @@ class LibManagerDialog:
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *a: self._refresh_list())
         e = tk.Entry(hdr, textvariable=self.search_var, font=("Segoe UI", 10),
-                      bg=th("input"), fg=th("fg"), insertbackground="white", bd=0,
+                      bg=th("input"), fg=th("fg"), insertbackground=th("caret"), bd=0,
                       highlightthickness=1, highlightbackground=th("title"), width=30)
         e.pack(side=tk.RIGHT, padx=10, pady=8)
         tk.Label(hdr, text="🔍", font=("Segoe UI", 10), fg=th("dim"), bg=th("title")).pack(side=tk.RIGHT)
@@ -824,6 +920,146 @@ class LibManagerDialog:
         os.startfile(libs_dir)
 
 
+class UpdateDialog:
+    def __init__(self, parent):
+        self.top = tk.Toplevel(parent)
+        self.top.title("Обновления")
+        self.top.geometry("520x340")
+        self.top.configure(bg=th("bg"))
+        self.top.transient(parent)
+        self.top.grab_set()
+        self.result = None
+        self._build_ui()
+        self._check()
+
+    def _build_ui(self):
+        hdr = tk.Frame(self.top, bg=th("title"), height=50)
+        hdr.pack(fill=tk.X)
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text="  Обновления OUT IDE", font=("Segoe UI", 14, "bold"),
+                 fg=th("bright"), bg=th("title")).pack(side=tk.LEFT, padx=10)
+
+        body = tk.Frame(self.top, bg=th("bg"))
+        body.pack(fill=tk.BOTH, expand=True, padx=14, pady=12)
+
+        self.info_var = tk.StringVar(value="Проверка обновлений...")
+        self.info = tk.Label(body, textvariable=self.info_var, font=("Segoe UI", 10),
+                             fg=th("fg"), bg=th("bg"), justify=tk.LEFT, anchor="w", wraplength=470)
+        self.info.pack(fill=tk.X, pady=(4, 8))
+
+        tok_row = tk.Frame(body, bg=th("bg"))
+        tok_row.pack(fill=tk.X, pady=(8, 4))
+        tk.Label(tok_row, text="GitHub токен:", font=("Segoe UI", 9),
+                 fg=th("dim"), bg=th("bg")).pack(side=tk.LEFT, padx=(0, 6))
+        self.token_var = tk.StringVar(value=get_github_token())
+        self.token_entry = tk.Entry(tok_row, textvariable=self.token_var, font=("Consolas", 9),
+                                    bg=th("input"), fg=th("fg"),
+                                    insertbackground=th("caret"), bd=0,
+                                    highlightthickness=1, highlightbackground=th("title"), show="*")
+        self.token_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.token_entry.bind("<Return>", lambda e: self._check())
+        hint = tk.Label(body, text="Токен нужен для доступа к приватному серверу обновлений.\nСоздать: GitHub → Settings → Developer settings → Tokens (classic) → доступ: repo.",
+                        font=("Segoe UI", 8), fg=th("dim"), bg=th("bg"), justify=tk.LEFT, anchor="w")
+        hint.pack(fill=tk.X, pady=(0, 6))
+
+        bar = tk.Frame(self.top, bg=th("bg"))
+        bar.pack(fill=tk.X, padx=14, pady=(0, 12))
+        self.download_btn = tk.Button(bar, text="⬇ Скачать и установить", command=self._download,
+                                      font=("Segoe UI", 10, "bold"), bg="#2e7d32", fg=th("bright"),
+                                      bd=0, padx=16, pady=6, activebackground="#388e3c",
+                                      cursor="hand2", state=tk.DISABLED)
+        self.download_btn.pack(side=tk.LEFT)
+        self.close_btn = tk.Button(bar, text="Закрыть", command=self.top.destroy,
+                                   font=("Segoe UI", 10), bg=th("input"), fg=th("fg"),
+                                   bd=0, padx=16, pady=6, activebackground=th("hover"),
+                                   cursor="hand2")
+        self.close_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+    def _check(self):
+        token = self.token_var.get().strip()
+        save_github_token(token)
+        if not token:
+            self.info_var.set("Введите GitHub-токен для доступа к серверу обновлений\nи нажмите Enter.")
+            self.download_btn.config(state=tk.DISABLED)
+            self.result = None
+            self.token_entry.focus_set()
+            return
+        self.info_var.set("Проверка обновлений...")
+        self.download_btn.config(state=tk.DISABLED)
+        self.result = None
+
+        def worker():
+            try:
+                data = check_update(token)
+                self.top.after(0, self._on_check_done, True, data)
+            except Exception as e:
+                self.top.after(0, self._on_check_done, False, str(e))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_check_done(self, ok, result):
+        if not ok:
+            if "404" in str(result) or "403" in str(result):
+                self.info_var.set(f"Нет доступа к серверу обновлений.\n"
+                                  f"Проверьте токен (должен иметь доступ repo).\n{result}")
+            else:
+                self.info_var.set(f"Ошибка проверки обновлений:\n{result}")
+            return
+        self.result = result
+        try:
+            remote = parse_version(result.get("version", ""))
+            current = parse_version(APP_VERSION)
+        except Exception:
+            remote = (0, 0, 0)
+            current = (0, 0, 0)
+        latest = result.get("latest", {})
+        asset_url = latest.get("url", "")
+        if remote > current:
+            if asset_url:
+                self.download_btn.config(state=tk.NORMAL)
+            notes = result.get("notes", "")
+            self.info_var.set(f"Доступна новая версия: {result.get('version')}\n"
+                              f"Текущая версия: {APP_VERSION}\n\n"
+                              f"{notes}" if notes else f"Доступна новая версия: {result.get('version')}\n"
+                              f"Текущая версия: {APP_VERSION}")
+        else:
+            self.info_var.set(f"У вас актуальная версия ({APP_VERSION}).\n\nВерсия на сервере: {result.get('version')}")
+
+    def _download(self):
+        if not self.result:
+            return
+        latest = self.result.get("latest", {})
+        asset_url = latest.get("url", "")
+        if not asset_url:
+            self.info_var.set("Ссылка на установщик не найдена")
+            return
+        token = self.token_var.get().strip()
+        self.download_btn.config(state=tk.DISABLED)
+        self.info_var.set("Скачивание установщика...")
+
+        def worker():
+            try:
+                dest = os.path.join(tempfile.gettempdir(), "OUT-IDE-Setup.exe")
+                download_installer(asset_url, token, dest)
+                self.top.after(0, self._on_download_done, True, dest)
+            except Exception as e:
+                self.top.after(0, self._on_download_done, False, str(e))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_download_done(self, ok, result):
+        if not ok:
+            self.download_btn.config(state=tk.NORMAL)
+            self.info_var.set(f"Ошибка скачивания:\n{result}")
+            return
+        self.info_var.set(f"Скачано: {result}\nЗапускаю установщик...")
+        try:
+            os.startfile(result)
+            self.top.after(1500, self.top.destroy)
+        except Exception as e:
+            self.info_var.set(f"Не удалось запустить установщик: {e}")
+
+
 class OutIde:
     def __init__(self, root):
         self.root = root
@@ -840,6 +1076,7 @@ class OutIde:
         self._sidebar_visible = True
         self._panel_visible = True
         self._panel_height = 200
+        self._encoding = "utf-8"
         self.theme_var = tk.StringVar(value=_current_theme)
 
         self._build_menu()
@@ -849,6 +1086,20 @@ class OutIde:
         self._build_status_bar()
         self._bind_keys()
         self._update_cursor_pos()
+        self.root.after(2000, self._auto_check_update)
+
+    def _auto_check_update(self):
+        def worker():
+            try:
+                data = check_update()
+                remote = parse_version(data.get("version", ""))
+                current = parse_version(APP_VERSION)
+                if remote > current:
+                    self.root.after(0, lambda: self.status_left.config(
+                        text=f"Доступно обновление {data.get('version')} — Ctrl+U"))
+            except Exception:
+                pass
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_menu(self):
         mb = tk.Menu(self.root, bg=th("title"), fg=th("fg"), activebackground=th("splash_accent"),
@@ -906,6 +1157,8 @@ class OutIde:
                             font=("Segoe UI", 9))
         help_menu.add_command(label="О программе", command=lambda: messagebox.showinfo(
             APP_NAME, f"{APP_NAME} v{APP_VERSION}\nЯзык программирования OUT\nКомпилятор + IDE"))
+        help_menu.add_separator()
+        help_menu.add_command(label="Проверить обновления   Ctrl+U", command=self._open_update_dialog)
         mb.add_cascade(label="Справка", menu=help_menu)
 
         self.root.config(menu=mb)
@@ -969,7 +1222,7 @@ class OutIde:
 
         self.editor = tk.Text(self.editor_area, wrap=tk.NONE, undo=True,
                                font=("Consolas", 11), bg=th("bg"), fg=th("fg"),
-                               insertbackground="white", border=0, highlightthickness=0,
+                               insertbackground=th("caret"), border=0, highlightthickness=0,
                                selectbackground=th("selection"), padx=8)
         self.editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -1062,6 +1315,7 @@ class OutIde:
         self.root.bind("<Control-grave>", lambda e: self._toggle_panel())
         self.root.bind("<Control-Shift-E>", lambda e: self._toggle_sidebar())
         self.root.bind("<Control-Shift-L>", lambda e: self._open_lib_manager())
+        self.root.bind("<Control-u>", lambda e: self._open_update_dialog())
         self.root.bind("<F5>", lambda e: self.run_script())
 
         self.editor.bind("<KeyRelease>", self._on_key)
@@ -1290,8 +1544,7 @@ class OutIde:
     def _auto_save(self):
         if self.current_file:
             try:
-                with open(self.current_file, "w", encoding="utf-8") as f:
-                    f.write(self.editor.get("1.0", tk.END))
+                save_text(self.current_file, self.editor.get("1.0", tk.END), self._encoding)
                 self.status_left.config(text=f"Автосохранено: {os.path.basename(self.current_file)}")
             except Exception:
                 pass
@@ -1502,6 +1755,9 @@ class OutIde:
     def _open_lib_manager(self):
         LibManagerDialog(self.root)
 
+    def _open_update_dialog(self):
+        UpdateDialog(self.root)
+
     def apply_theme(self, name):
         global _current_theme, KEYWORD_COLORS
         if name not in THEMES or name == _current_theme:
@@ -1557,6 +1813,8 @@ class OutIde:
     def new_file(self):
         self.editor.delete("1.0", tk.END)
         self.current_file = ""
+        self._encoding = "utf-8"
+        self.enc_label.config(text="UTF-8")
         self.root.title(f"{APP_NAME} — Новый")
         self.tab_bar.add_tab("Новый", "")
         self._update_line_numbers()
@@ -1573,13 +1831,14 @@ class OutIde:
 
     def _load_file(self, path):
         try:
-            with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
-                content = f.read()
+            encoding, content = open_text(path)
         except Exception:
             return
         self.editor.delete("1.0", tk.END)
         self.editor.insert("1.0", content)
         self.current_file = path
+        self._encoding = encoding
+        self.enc_label.config(text=encoding.upper())
         self.root.title(f"{APP_NAME} — {os.path.basename(path)}")
         self._update_line_numbers()
         self._highlight_syntax()
@@ -1589,8 +1848,7 @@ class OutIde:
         if not self.current_file:
             return self.save_as()
         try:
-            with open(self.current_file, "w", encoding="utf-8") as f:
-                f.write(self.editor.get("1.0", tk.END))
+            save_text(self.current_file, self.editor.get("1.0", tk.END), self._encoding)
             self.status_left.config(text=f"Сохранено: {os.path.basename(self.current_file)}")
             for t in self.tab_bar.tabs:
                 if t["path"] == self.current_file:
