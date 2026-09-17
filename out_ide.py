@@ -9,6 +9,8 @@ import json
 import urllib.request
 import urllib.error
 import tkinter as tk
+import queue
+import traceback
 from tkinter import font as tkfont, filedialog, messagebox, ttk
 import json
 
@@ -21,7 +23,7 @@ def get_base_path():
 
 OUT_EXE = os.path.join(get_base_path(), "out.exe")
 APP_NAME = "OUT IDE"
-APP_VERSION = "0.6.2"
+APP_VERSION = "0.6.3"
 
 DEFAULT_THEME = "dark"
 _current_theme = DEFAULT_THEME
@@ -1036,6 +1038,7 @@ class OutIde:
         self._panel_height = 200
         self._encoding = "utf-8"
         self.theme_var = tk.StringVar(value=_current_theme)
+        self._cmd_queue = queue.Queue()
 
         self._build_menu()
         self._build_toolbar()
@@ -1044,7 +1047,42 @@ class OutIde:
         self._build_status_bar()
         self._bind_keys()
         self._update_cursor_pos()
+        self._apply_widget_defaults()
         self.root.after(2000, self._auto_check_update)
+        self.root.after(100, self._poll_queue)
+
+    def _apply_widget_defaults(self):
+        self.root.option_add("*Menu.background", th("title"))
+        self.root.option_add("*Menu.foreground", th("fg"))
+        self.root.option_add("*Menu.activeBackground", th("splash_accent"))
+        self.root.option_add("*Menu.activeForeground", th("bright"))
+        self.root.option_add("*Menu.selectColor", th("accent"))
+        self.root.option_add("*Menu.borderWidth", 0)
+        self.root.option_add("*Button.background", th("input"))
+        self.root.option_add("*Button.foreground", th("fg"))
+        self.root.option_add("*Button.activeBackground", th("hover"))
+        self.root.option_add("*Button.activeForeground", th("fg"))
+        self.root.option_add("*Button.highlightBackground", th("title"))
+        self.root.option_add("*Button.highlightColor", th("title"))
+        self.root.option_add("*Button.borderWidth", 0)
+        self.root.option_add("*Label.background", th("bg"))
+        self.root.option_add("*Label.foreground", th("fg"))
+        self.root.option_add("*Frame.background", th("bg"))
+
+        def fix(w):
+            try:
+                if isinstance(w, tk.Button):
+                    w.configure(bg=th("input"), fg=th("fg"),
+                                activebackground=th("hover"), activeforeground=th("fg"),
+                                highlightbackground=th("title"))
+            except tk.TclError:
+                pass
+            for c in w.winfo_children():
+                try:
+                    fix(c)
+                except tk.TclError:
+                    pass
+        fix(self.root)
 
     def _auto_check_update(self):
         def worker():
@@ -1122,9 +1160,14 @@ class OutIde:
         self.root.config(menu=mb)
 
     def _build_toolbar(self):
-        self.toolbar = tk.Frame(self.root, bg=th("toolbar"), height=TOOLBAR_HEIGHT)
-        self.toolbar.pack(side=tk.TOP, fill=tk.X)
-        self.toolbar.pack_propagate(False)
+        if not hasattr(self, "toolbar") or not self.toolbar.winfo_exists():
+            self.toolbar = tk.Frame(self.root, bg=th("toolbar"), height=TOOLBAR_HEIGHT)
+            self.toolbar.pack(side=tk.TOP, fill=tk.X)
+            self.toolbar.pack_propagate(False)
+        else:
+            self.toolbar.configure(bg=th("toolbar"))
+            for w in self.toolbar.winfo_children():
+                w.destroy()
 
         bs = {"font": ("Segoe UI", 9), "bd": 0, "padx": 10, "pady": 5, "cursor": "hand2",
               "activebackground": "#4a4a4a", "activeforeground": th("bright")}
@@ -1297,9 +1340,9 @@ class OutIde:
         self.context_menu.add_command(label="Найти           Ctrl+F", command=self._toggle_find)
         self.context_menu.add_command(label="Комментировать  Ctrl+/", command=self._toggle_comment)
 
-        self.root.bind("<Control-x>", lambda e: self._cut())
-        self.root.bind("<Control-c>", lambda e: self._copy())
-        self.root.bind("<Control-v>", lambda e: self._paste())
+        self.editor.bind("<Control-x>", lambda e: self._cut() or "break")
+        self.editor.bind("<Control-c>", lambda e: self._copy() or "break")
+        self.editor.bind("<Control-v>", lambda e: self._paste() or "break")
         self.root.bind("<Control-a>", lambda e: self._select_all())
         self.root.bind("<Control-z>", lambda e: self._safe_undo())
         self.root.bind("<Control-y>", lambda e: self._safe_redo())
@@ -1322,6 +1365,7 @@ class OutIde:
                 text = self.editor.get(sel[0], sel[1])
                 self.root.clipboard_clear()
                 self.root.clipboard_append(text)
+                self.root.update()
                 self.editor.delete(sel[0], sel[1])
         except Exception:
             pass
@@ -1331,13 +1375,19 @@ class OutIde:
             sel = self.editor.tag_ranges("sel")
             if sel:
                 text = self.editor.get(sel[0], sel[1])
+                if not text:
+                    return
                 self.root.clipboard_clear()
                 self.root.clipboard_append(text)
+                self.root.update()
+                self.status_left.config(text=f"Скопировано ({len(text)} симв.)")
             else:
                 line = self.editor.index(tk.INSERT).split(".")[0]
                 text = self.editor.get(f"{line}.0", f"{line}.0+1line")
                 self.root.clipboard_clear()
                 self.root.clipboard_append(text)
+                self.root.update()
+                self.status_left.config(text=f"Скопировано: строка {line}")
         except Exception:
             pass
 
@@ -1726,9 +1776,8 @@ class OutIde:
         save_theme_config(name)
         KEYWORD_COLORS = make_keyword_colors()
         self.root.configure(bg=th("bg"))
+        self._apply_widget_defaults()
         self._build_menu()
-        for w in self.toolbar.winfo_children():
-            w.destroy()
         self._build_toolbar()
         _recolor_children(self.root, THEMES[old], THEMES[name])
         self.editor.configure(bg=th("bg"), fg=th("fg"),
@@ -1839,13 +1888,26 @@ class OutIde:
             try:
                 r = subprocess.run([exe] + args, capture_output=True, text=True,
                                    timeout=timeout, creationflags=subprocess.CREATE_NO_WINDOW)
-                self.root.after(0, callback, r.returncode, r.stdout + r.stderr)
+                self._cmd_queue.put((callback, r.returncode, r.stdout + r.stderr))
             except subprocess.TimeoutExpired:
-                self.root.after(0, callback, 1, f"Таймаут ({timeout}с)")
+                self._cmd_queue.put((callback, 1, f"Таймаут ({timeout}с)"))
             except Exception as e:
-                self.root.after(0, callback, 1, str(e))
+                self._cmd_queue.put((callback, 1, str(e)))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _poll_queue(self):
+        try:
+            while True:
+                callback, code, out = self._cmd_queue.get_nowait()
+                try:
+                    callback(code, out)
+                except Exception as e:
+                    self._append_output(f"Ошибка обработчика: {e}\n", "error")
+                    self.status_left.config(text="Ошибка обработчика")
+        except queue.Empty:
+            pass
+        self.root.after(100, self._poll_queue)
 
     def verify_script(self):
         self.status_left.config(text="Проверка...")
@@ -1867,7 +1929,7 @@ class OutIde:
                 self.status_left.config(text="Ошибки найдены")
                 self._highlight_errors(self.editor)
 
-        self._run_cmd(["run", tmpfile], 30, on_done)
+        self._run_cmd(["errors", tmpfile], 30, on_done)
 
     def run_script(self):
         self.status_left.config(text="Запуск...")
@@ -1920,6 +1982,22 @@ class OutIde:
             self.root.clipboard_clear()
             self.root.clipboard_append(self.last_error)
             self.status_left.config(text="Ошибка скопирована")
+
+    def copy_code(self):
+        try:
+            sel = self.editor.tag_ranges("sel")
+            if sel:
+                text = self.editor.get(sel[0], sel[1])
+            else:
+                text = self.editor.get("1.0", tk.END).rstrip("\n")
+            if not text:
+                return
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update()
+            self.status_left.config(text=f"Скопировано ({len(text)} симв.)")
+        except Exception:
+            pass
 
 
 def main():
