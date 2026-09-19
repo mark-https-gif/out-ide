@@ -23,7 +23,7 @@ def get_base_path():
 
 OUT_EXE = os.path.join(get_base_path(), "out.exe")
 APP_NAME = "OUT IDE"
-APP_VERSION = "0.6.3"
+APP_VERSION = "0.6.4"
 
 DEFAULT_THEME = "dark"
 _current_theme = DEFAULT_THEME
