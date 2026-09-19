@@ -6,3 +6,4 @@ __pycache__/
 OUT IDE.exe
 *.exe
 !samples/
+last_error.txt
