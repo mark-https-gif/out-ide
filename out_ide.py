@@ -411,7 +411,9 @@ class FileExplorer:
             if d.startswith(".") or d.startswith("__"):
                 continue
             self.tree.create_text(16, y, text=f"📁 {d}", font=("Segoe UI", 9),
-                                  fill=th("dim"), anchor="w", tags=("item",))
+                                  fill=th("dim"), anchor="w", cursor="hand2", tags=("dir",))
+            fp_d = os.path.join(self.current_dir, d)
+            self.tree.tag_bind("dir", "<Button-1>", lambda e, p=fp_d: self._open_sketch(p))
             y += 22
 
         for f in files:
@@ -433,6 +435,20 @@ class FileExplorer:
 
     def _open_file(self, path):
         self.on_open(path)
+
+    def _open_sketch(self, path):
+        """Arduino-style: click on a folder -> open every .out inside as tabs."""
+        outs = []
+        if os.path.isdir(path):
+            for root, _, filenames in os.walk(path):
+                for fn in filenames:
+                    if fn.endswith(".out") and not fn.startswith("."):
+                        outs.append(os.path.join(root, fn))
+        elif path.endswith(".out"):
+            outs.append(path)
+        outs.sort(key=lambda p: (os.path.dirname(p), os.path.basename(p)))
+        if outs:
+            self.on_open(outs if len(outs) > 1 else outs[0])
 
 
 class TabBar:
@@ -1826,15 +1842,28 @@ class OutIde:
         self.tab_bar.add_tab("Новый", "")
         self._update_line_numbers()
 
-    def open_file(self, path=None):
-        if not path:
-            path = filedialog.askopenfilename(title="Открыть файл",
-                                               filetypes=[("OUT", "*.out"), ("Все файлы", "*.*")])
-        if not path:
+    def open_file(self, paths=None):
+        if not paths:
+            paths = filedialog.askopenfilenames(title="Открыть файлы (Ctrl+клик — несколько)",
+                                                filetypes=[("OUT", "*.out"), ("Все файлы", "*.*")])
+        if not paths:
             return
+        if isinstance(paths, tuple):
+            paths = list(paths)
+        if not isinstance(paths, list):
+            paths = [paths]
+        first = True
+        for path in paths:
+            self._open_one(path)
+            if first:
+                self.first_open_dir = os.path.dirname(path)
+                first = False
+        if self.first_open_dir:
+            self.sidebar.set_directory(self.first_open_dir)
+
+    def _open_one(self, path):
         self._load_file(path)
         self.tab_bar.add_tab(os.path.basename(path), path)
-        self.sidebar.set_directory(os.path.dirname(path))
 
     def _load_file(self, path):
         try:
