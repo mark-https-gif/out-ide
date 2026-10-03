@@ -1,72 +1,23 @@
 [
-  {
-    "name": "random",
-    "file": "random.out",
-    "description": "Генерация случайных чисел: int(), float(), choice(), shuffle()",
-    "category": "Математика",
-    "url": "random"
-  },
-  {
-    "name": "mathex",
-    "file": "mathex.out",
-    "description": "Расширенная математика: clamp(), lerp(), map(), constrain()",
-    "category": "Математика",
-    "url": "mathex"
-  },
-  {
-    "name": "stringslib",
-    "file": "stringslib.out",
-    "description": "Работа со строками: contains(), replace(), repeat(), reverse()",
-    "category": "Утилиты",
-    "url": "stringslib"
-  },
-  {
-    "name": "http",
-    "file": "http.out",
-    "description": "HTTP запросы: get(), post(), put(), delete()",
-    "category": "Сеть",
-    "url": "http"
-  },
-  {
-    "name": "json",
-    "file": "json.out",
-    "description": "JSON парсинг: parse(), stringify(), pretty()",
-    "category": "Данные",
-    "url": "json"
-  },
-  {
-    "name": "crypto",
-    "file": "crypto.out",
-    "description": "Криптография: hash(), md5(), sha256(), hmac()",
-    "category": "Безопасность",
-    "url": "crypto"
-  },
-  {
-    "name": "datetime",
-    "file": "datetime.out",
-    "description": "Дата и время: now(), format(), parse(), timestamp()",
-    "category": "Утилиты",
-    "url": "datetime"
-  },
-  {
-    "name": "logging",
-    "file": "logging.out",
-    "description": "Логирование: info(), warn(), error(), debug()",
-    "category": "Утилиты",
-    "url": "logging"
-  },
-  {
-    "name": "dev",
-    "file": "dev.out",
-    "description": "Работа с оборудованием: boards, pin(), digitalRead(), analogWrite()",
-    "category": "Железо",
-    "url": "dev"
-  },
-  {
-    "name": "testing",
-    "file": "testing.out",
-    "description": "Юнит-тесты: assert(), assertEqual(), describe(), it()",
-    "category": "Разработка",
-    "url": "testing"
-  }
+    {
+        "name":  "random",
+        "file":  "random.out",
+        "description":  "Генерация случайных чисел: int(), float(), choice(), shuffle()",
+        "category":  "Математика",
+        "url":  "random"
+    },
+    {
+        "name":  "mathex",
+        "file":  "mathex.out",
+        "description":  "Расширенная математика: clamp(), lerp(), map(), constrain()",
+        "category":  "Математика",
+        "url":  "mathex"
+    },
+    {
+        "name":  "stringslib",
+        "file":  "stringslib.out",
+        "description":  "Работа со строками: contains(), replace(), repeat(), reverse()",
+        "category":  "Утилиты",
+        "url":  "stringslib"
+    }
 ]
